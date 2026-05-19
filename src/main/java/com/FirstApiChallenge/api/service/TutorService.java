@@ -2,9 +2,11 @@ package com.FirstApiChallenge.api.service;
 
 import com.FirstApiChallenge.api.dto.TutorRequestDTO;
 import com.FirstApiChallenge.api.dto.TutorResponseDTO;
+import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.model.Animal;
 import com.FirstApiChallenge.api.model.Tutor;
 import com.FirstApiChallenge.api.repository.TutorRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,10 +32,10 @@ public class TutorService {
     @Transactional
     public TutorResponseDTO authenticateTutor(TutorRequestDTO requestDTO) {
         Tutor tutor = tutorRepository.findByCpf(requestDTO.cpf())
-                .orElseThrow(() -> new RuntimeException("Usuario não encontrado"));
+                .orElseThrow(() -> new CustomException("Usuario não encontrado", HttpStatus.NOT_FOUND));
 
         if (!tutor.getPassword().equals(requestDTO.password())){
-            throw new RuntimeException("senha incorreta");
+            throw new CustomException("senha incorreta", HttpStatus.UNAUTHORIZED);
         }
 
         return TutorResponseDTO.fromEntity(tutor);
@@ -43,7 +45,7 @@ public class TutorService {
     public TutorResponseDTO createTutor(TutorRequestDTO requestDTO) {
 
         if (tutorRepository.findByCpf(requestDTO.cpf()).isPresent()) {
-           throw new RuntimeException("CPF já cadastrado");
+           throw new CustomException("CPF já cadastrado", HttpStatus.CONFLICT);
         }
 
 
@@ -65,6 +67,11 @@ public class TutorService {
 
     @Transactional
     public Optional<TutorResponseDTO> updateTutorByCpf(String cpf, TutorRequestDTO requestDTO) {
+
+        if (tutorRepository.findByCpf(requestDTO.cpf()).isEmpty()) {
+            throw new CustomException("CPF não encontrado", HttpStatus.NOT_FOUND);
+        }
+
         return tutorRepository.findByCpf(cpf).map(tutorExistent -> {
             tutorExistent.setName(requestDTO.name());
             tutorExistent.setEmail(requestDTO.email());
@@ -84,12 +91,12 @@ public class TutorService {
     @Transactional
     public TutorResponseDTO createAnimal(String cpf, Set<Animal> newAnimal) {
         Tutor tutor = tutorRepository.findByCpf(cpf)
-                .orElseThrow(() -> new RuntimeException("Tutor não encointrado"));
+                .orElseThrow(() -> new CustomException("Tutor não encointrado", HttpStatus.NOT_FOUND));
 
         for (Animal animal : tutor.getAnimals()) {
             for (Animal animalNew : newAnimal) {
                 if (animal.getName().equals(animalNew.getName())) {
-                    throw new RuntimeException("Este animal já está cadastrado");
+                    throw new CustomException("Este animal já está cadastrado", HttpStatus.CONFLICT);
                 } else {
                     tutor.setAnimals(newAnimal);
                 }
@@ -105,12 +112,12 @@ public class TutorService {
     @Transactional
     public Set<Animal> readAnimalsByTutor(String cpf) {
         Tutor tutor = tutorRepository.findByCpf(cpf)
-                .orElseThrow(() -> new RuntimeException("Tutor não encontrado"));
+                .orElseThrow(() -> new CustomException("Tutor não encontrado", HttpStatus.NOT_FOUND));
 
         Set<Animal> animals = tutor.getAnimals();
 
         if (animals.isEmpty()){
-            throw new RuntimeException("Não há animais cadastrados");
+            throw new CustomException("Não há animais cadastrados", HttpStatus.NOT_FOUND);
         }
 
         return animals;
