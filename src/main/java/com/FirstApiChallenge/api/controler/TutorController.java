@@ -7,6 +7,7 @@ import com.FirstApiChallenge.api.service.TutorService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import com.FirstApiChallenge.api.model.Animal;
 
@@ -21,6 +22,11 @@ public class TutorController {
 
     public TutorController(TutorService tutorService) {
         this.tutorService = tutorService;
+    }
+
+    @GetMapping("/ping")
+    public ResponseEntity<String> ping(){
+        return ResponseEntity.ok("ping ok!");
     }
 
     @PostMapping
