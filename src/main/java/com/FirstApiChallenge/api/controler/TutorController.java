@@ -28,7 +28,6 @@ public class TutorController {
     public ResponseEntity<String> ping(){
         return ResponseEntity.ok("ping ok!");
     }
-
     @PostMapping
     public ResponseEntity<TutorResponseDTO> create(@RequestBody @Valid TutorRequestDTO dto){
         TutorResponseDTO response = tutorService.createTutor(dto);
