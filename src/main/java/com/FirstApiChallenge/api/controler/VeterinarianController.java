@@ -25,7 +25,7 @@ public class VeterinarianController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/Veterinarian/Login")
+    @PostMapping("/Login")
     public ResponseEntity<?> login(@RequestBody VeterinarianRequestDTO dto) {
         VeterinarianResponseDTO response;
         try {
@@ -36,7 +36,7 @@ public class VeterinarianController {
         }
     }
 
-    @GetMapping("/Veterinarian/{cpf}")
+    @GetMapping("/{cpf}")
     public ResponseEntity<VeterinarianResponseDTO> searchVeterinarianByCpf(@PathVariable String cpf){
         return veterinarianService.searchVeterinarianByCpf(cpf)
                 .map(ResponseEntity::ok)
