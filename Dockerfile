@@ -35,7 +35,7 @@ WORKDIR /app
 
 # Busca o binário nativo gerado na pasta /target do estágio anterior
 # IMPORTANTE: Mude "nome-do-seu-projeto" para o artifactId exato do seu pom.xml (em letras minúsculas)
-COPY --from=build /app/target/nome-do-seu-projeto ./app
+COPY --from=build /app/target/api ./app
 
 EXPOSE 8080
 
