@@ -2,8 +2,10 @@ package com.FirstApiChallenge.api.service;
 
 import com.FirstApiChallenge.api.dto.VeterinarianRequestDTO;
 import com.FirstApiChallenge.api.dto.VeterinarianResponseDTO;
+import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.model.Veterinarian;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +29,10 @@ public class VeterinarianService {
     @Transactional
     public VeterinarianResponseDTO authenticateVeterinarian(VeterinarianRequestDTO requestDTO) {
         Veterinarian veterinarian = veterinarianRepository.findByCpf(requestDTO.cpf())
-                .orElseThrow(() -> new RuntimeException("Veterinario não encontrado"));
+                .orElseThrow(() -> new CustomException("Veterinario não encontrado", HttpStatus.NOT_FOUND));
 
         if (!veterinarian.getPassword().equals(requestDTO.password())){
-            throw new RuntimeException("Senha incorreta");
+            throw new CustomException("Senha incorreta", HttpStatus.UNAUTHORIZED);
         }
 
         return VeterinarianResponseDTO.fromEntity(veterinarian);
@@ -41,7 +43,7 @@ public class VeterinarianService {
     public VeterinarianResponseDTO createVeterinarian(VeterinarianRequestDTO requestDTO) {
 
         if (veterinarianRepository.findByCpf(requestDTO.cpf()).isPresent()) {
-            throw new RuntimeException("CPF já cadastrado");
+            throw new CustomException("CPF já cadastrado", HttpStatus.CONFLICT);
         }
 
         Veterinarian veterinarian = new Veterinarian();
