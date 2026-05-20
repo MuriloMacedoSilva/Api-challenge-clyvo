@@ -42,6 +42,7 @@ public class Veterinarian {
     private String crmvNumber;
 
     @Size(min = 2, max = 2)
+    @Column
     private String crmvState; // Ex: "SP"
 
     @Column(nullable = false, length = 14)
