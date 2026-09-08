@@ -3,6 +3,7 @@ package com.FirstApiChallenge.api.dto;
 import com.FirstApiChallenge.api.model.Animal;
 import com.FirstApiChallenge.api.model.Tutor;
 import com.FirstApiChallenge.api.model.Veterinarian;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.Set;
 
@@ -15,6 +16,7 @@ public record TutorResponseDTO(
         String password,
         String role,
         Set<Animal> animals,
+        @JsonIgnore
         Set<Veterinarian> veterinarians
 ) {
     public static TutorResponseDTO fromEntity (Tutor tutor) {
