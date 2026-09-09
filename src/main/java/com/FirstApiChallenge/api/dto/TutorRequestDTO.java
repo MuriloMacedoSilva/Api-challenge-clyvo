@@ -32,10 +32,5 @@ public record TutorRequestDTO(
         String password,
 
         @NotBlank(message = "role é obrigatório")
-        String role,
-
-        Set<Animal> animals,
-
-        Set<Veterinarian> veterinarians
-
+        String role
 ) {}

@@ -35,9 +35,7 @@ public record VeterinarianRequestDTO(
         String crmvState,
 
         @NotBlank(message = "CNPJ é obrigatório")
-        String cnpj,
-
-        Set<Tutor> tutors
+        String cnpj
 
 ) {
 }

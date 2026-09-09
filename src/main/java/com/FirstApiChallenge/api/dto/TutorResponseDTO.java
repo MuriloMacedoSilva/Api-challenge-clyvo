@@ -6,6 +6,7 @@ import com.FirstApiChallenge.api.model.Veterinarian;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public record TutorResponseDTO(
         Long id,
@@ -15,11 +16,11 @@ public record TutorResponseDTO(
         String phoneNumber,
         String password,
         String role,
-        Set<Animal> animals,
-        @JsonIgnore
-        Set<Veterinarian> veterinarians
+        Set<AnimalResponseDTO> animals
+//        @JsonIgnore
+//        Set<Veterinarian> veterinarians
 ) {
-    public static TutorResponseDTO fromEntity (Tutor tutor) {
+    public static TutorResponseDTO fromEntity(Tutor tutor) {
         return new TutorResponseDTO(
                 tutor.getId(),
                 tutor.getName(),
@@ -28,7 +29,11 @@ public record TutorResponseDTO(
                 tutor.getPhoneNumber(),
                 tutor.getPassword(),
                 tutor.getRole(),
-                tutor.getAnimals(),
-                tutor.getVeterinarians());
+                tutor.getAnimals()
+                        .stream()
+                        .map(AnimalResponseDTO::fromEntity)
+                        .collect(Collectors.toSet())
+//                tutor.getVeterinarians()
+        );
     }
 }

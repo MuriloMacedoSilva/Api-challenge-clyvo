@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 
 @RestController
 @RequestMapping("/veterinarian")
@@ -42,5 +44,40 @@ public class VeterinarianController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @GetMapping("/{cpf}/tutors")
+    public ResponseEntity<List<TutorResponseDTO>> getTutorsByVeterinarianCpf(@PathVariable String cpf) {
+        List<TutorResponseDTO> tutors = veterinarianService.findTutorsByVeterinarianCpf(cpf);
+        return ResponseEntity.ok(tutors);
+    }
+
+//    @PutMapping("/{cpf}/animals")
+//    public ResponseEntity<TutorResponseDTO> updateAnimal(
+//            @PathVariable String cpf,
+//            @RequestParam String originalAnimalName,
+//            @RequestBody AnimalDTO updatedAnimalDTO) {
+//
+//        TutorResponseDTO updatedTutor = veterinarianService.updateAnimal(cpf, originalAnimalName, updatedAnimalDTO);
+//
+//        return ResponseEntity.ok(updatedTutor);
+//    }
+
+    @PutMapping("/{cpf}/animals/{animalId}")
+    public ResponseEntity<TutorResponseDTO> updateAnimal(
+            @PathVariable String cpf,
+            @PathVariable Long animalId,
+            @RequestBody @Valid AnimalDTO updatedAnimalDTO) {
+
+        TutorResponseDTO response =
+                veterinarianService.updateAnimal(
+                        cpf,
+                        animalId,
+                        updatedAnimalDTO
+                );
+
+        return ResponseEntity.ok(response);
+    }
 }
+
+
 

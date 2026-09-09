@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 public record AnimalDTO(
+
+        Long id,
+
         @NotBlank(message = "O nome do pet é obrigatório")
         String name,
 
@@ -27,18 +30,23 @@ public record AnimalDTO(
         @NotBlank(message = "A espécie do pet é obrigatória")
         String species,
 
-        String history // Opcional, sem anotação de obrigatoriedade
+        String history
+
 ) {
-    // Método utilitário para converter de DTO para Entidade
+
     public Animal toEntity() {
-        return new Animal(
-                this.name,
-                this.weight,
-                this.height,
-                this.age,
-                this.race,
-                this.species,
-                this.history
-        );
+
+        Animal animal = new Animal();
+
+        animal.setId(this.id());
+        animal.setName(this.name());
+        animal.setWeight(this.weight());
+        animal.setHeight(this.height());
+        animal.setAge(this.age());
+        animal.setRace(this.race());
+        animal.setSpecies(this.species());
+        animal.setHistory(this.history());
+
+        return animal;
     }
 }

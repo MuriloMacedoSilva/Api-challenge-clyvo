@@ -2,6 +2,7 @@ package com.FirstApiChallenge.api.controller;
 
 
 import com.FirstApiChallenge.api.dto.AnimalDTO;
+import com.FirstApiChallenge.api.dto.AnimalResponseDTO;
 import com.FirstApiChallenge.api.dto.TutorRequestDTO;
 import com.FirstApiChallenge.api.dto.TutorResponseDTO;
 import com.FirstApiChallenge.api.service.TutorService;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import com.FirstApiChallenge.api.model.Animal;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/tutor")
@@ -62,32 +64,69 @@ public class TutorController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+//    @GetMapping("/{cpf}/read-animals")
+//    public ResponseEntity<Set<Animal>> readAllAnimalsByCpf(@PathVariable String cpf) {
+//        Set<Animal> response = tutorService.readAnimalsByTutor(cpf);
+//        return ResponseEntity.ok(response);
+//    }
+
     @GetMapping("/{cpf}/read-animals")
-    public ResponseEntity<Set<Animal>> readAllAnimalsByCpf(@PathVariable String cpf) {
-        Set<Animal> response = tutorService.readAnimalsByTutor(cpf);
+    public ResponseEntity<Set<AnimalResponseDTO>> readAllAnimalsByCpf(@PathVariable String cpf) {
+
+        Set<AnimalResponseDTO> response = tutorService
+                .readAnimalsByTutor(cpf)
+                .stream()
+                .map(AnimalResponseDTO::fromEntity)
+                .collect(Collectors.toSet());
+
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{cpf}/animals")
+//    @PutMapping("/{cpf}/animals")
+//    public ResponseEntity<TutorResponseDTO> updateAnimal(
+//            @PathVariable String cpf,
+//            @RequestParam String originalAnimalName,
+//            @RequestBody AnimalDTO updatedAnimalDTO) {
+//
+//        TutorResponseDTO updatedTutor = tutorService.updateAnimal(cpf, originalAnimalName, updatedAnimalDTO);
+//
+//        return ResponseEntity.ok(updatedTutor);
+//    }
+
+    @PutMapping("/{cpf}/animals/{animalId}")
     public ResponseEntity<TutorResponseDTO> updateAnimal(
             @PathVariable String cpf,
-            @RequestParam String originalAnimalName,
-            @RequestBody AnimalDTO updatedAnimalDTO) {
+            @PathVariable Long animalId,
+            @RequestBody @Valid AnimalDTO updatedAnimalDTO) {
 
-        TutorResponseDTO updatedTutor = tutorService.updateAnimal(cpf, originalAnimalName, updatedAnimalDTO);
+        TutorResponseDTO response =
+                tutorService.updateAnimal(
+                        cpf,
+                        animalId,
+                        updatedAnimalDTO
+                );
 
-        return ResponseEntity.ok(updatedTutor);
+        return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{cpf}/animals")
-    public ResponseEntity<TutorResponseDTO> deleteAnimal(
+//    @DeleteMapping("/{cpf}/animals")
+//    public ResponseEntity<TutorResponseDTO> deleteAnimal(
+//            @PathVariable String cpf,
+//            @RequestParam String animalName) {
+//
+//        TutorResponseDTO updatedTutor = tutorService.deleteAnimal(cpf, animalName);
+//        return ResponseEntity.ok(updatedTutor);
+//    }
+
+    @DeleteMapping("/{cpf}/animals/{animalId}")
+    public ResponseEntity<Void> deleteAnimal(
             @PathVariable String cpf,
-            @RequestParam String animalName) {
+            @PathVariable Long animalId) {
 
-        TutorResponseDTO updatedTutor = tutorService.deleteAnimal(cpf, animalName);
-        return ResponseEntity.ok(updatedTutor);
+        tutorService.deleteAnimal(cpf, animalId);
+
+        return ResponseEntity.noContent().build();
     }
-
 
 }
 

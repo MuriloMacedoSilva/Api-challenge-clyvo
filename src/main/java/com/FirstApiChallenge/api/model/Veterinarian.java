@@ -51,9 +51,9 @@ public class Veterinarian {
     @Column(nullable = false, length = 14)
     private String cnpj;
 
-    @ManyToMany
-    @JoinTable(name = "veterinario_tutor")
-    private Set<Tutor> tutors = new HashSet<>();
+//    @ManyToMany
+//    @JoinTable(name = "veterinario_tutor")
+//    private Set<Tutor> tutors = new HashSet<>();
 
 
 }

@@ -16,5 +16,8 @@ public interface VeterinarianTutorLinkRepository extends JpaRepository<Veterinar
     List<VeterinarianTutorLink> findByTutorCpfAndStatus(String cpf, LinkStatus status);
 
     // Para verificar se um veterinário possui vínculo ACEITO com o tutor
-    boolean existsByVeterinarianCrmvNumberAndTutorCpfAndStatus(String crmvNumber, String cpf, LinkStatus status);
+    boolean existsByVeterinarianCpfAndTutorCpfAndStatus(String VeterinarianCpf, String cpf, LinkStatus status);
+
+    // Método para buscar os links aceitos filtrando pelo CPF do Veterinário
+    List<VeterinarianTutorLink> findByVeterinarianCpfAndStatus(String veterinarianCpf, LinkStatus status);
 }

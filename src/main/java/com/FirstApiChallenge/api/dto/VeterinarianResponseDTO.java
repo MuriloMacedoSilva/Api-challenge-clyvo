@@ -17,9 +17,9 @@ public record VeterinarianResponseDTO(
         String role,
         String crmvNumber,
         String crmvState,
-        String cnpj,
-        @JsonIgnore
-        Set<Tutor> tutors
+        String cnpj
+//        @JsonIgnore
+//        Set<Tutor> tutors
 ) {
     public static VeterinarianResponseDTO fromEntity (Veterinarian veterinarian) {
         return new VeterinarianResponseDTO(
@@ -32,7 +32,7 @@ public record VeterinarianResponseDTO(
                 veterinarian.getRole(),
                 veterinarian.getCrmvNumber(),
                 veterinarian.getCrmvState(),
-                veterinarian.getCnpj(),
-                veterinarian.getTutors());
+                veterinarian.getCnpj());
+//                veterinarian.getTutors());
     }
 }
