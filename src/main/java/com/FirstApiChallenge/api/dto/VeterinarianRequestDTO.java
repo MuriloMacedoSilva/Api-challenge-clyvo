@@ -1,9 +1,9 @@
 package com.FirstApiChallenge.api.dto;
 
-import com.FirstApiChallenge.api.model.Tutor;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-
-import java.util.Set;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 public record VeterinarianRequestDTO(
 
@@ -14,15 +14,18 @@ public record VeterinarianRequestDTO(
         String name,
 
         @NotBlank(message = "Email é obrigatório")
+        @Email(message = "Email deve ser válido")
         String email,
 
         @NotBlank(message = "CPF é obrigatório")
         String cpf,
 
-        @NotBlank(message = "Numero de Telefone é obrigatório")
+        @NotBlank(message = "Número de telefone é obrigatório")
+        @Pattern(regexp = "\\d{10,11}", message = "Número de telefone deve conter 10 ou 11 dígitos")
         String phoneNumber,
 
         @NotBlank(message = "Senha é obrigatório")
+        @Size(min = 8, max = 11, message = "A senha deve ter entre 8 e 11 caracteres")
         String password,
 
         @NotBlank(message = "Role é obrigatório")

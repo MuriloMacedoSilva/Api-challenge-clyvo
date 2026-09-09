@@ -63,7 +63,7 @@ public class VeterinarianService {
     public VeterinarianResponseDTO createVeterinarian(VeterinarianRequestDTO requestDTO) {
 
         if (veterinarianRepository.findByCpf(requestDTO.cpf()).isPresent()) {
-            throw new RuntimeException("CPF já cadastrado");
+            throw new CustomException("CPF já cadastrado", HttpStatus.CONFLICT);
         }
 
         Veterinarian veterinarian = new Veterinarian();
@@ -108,7 +108,7 @@ public class VeterinarianService {
     public List<TutorResponseDTO> findTutorsByVeterinarianCpf(String cpf) {
 
         Veterinarian veterinarian = veterinarianRepository.findByCpf(cpf)
-                .orElseThrow(() -> new RuntimeException("Veterinário não encontrado"));
+                .orElseThrow(() -> new CustomException("Veterinário não encontrado", HttpStatus.NOT_FOUND));
 
 //        return veterinarian.getTutors().stream()
 //                .map(TutorResponseDTO::fromEntity)

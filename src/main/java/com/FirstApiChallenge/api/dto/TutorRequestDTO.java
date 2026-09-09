@@ -1,14 +1,9 @@
 package com.FirstApiChallenge.api.dto;
 
-import com.FirstApiChallenge.api.model.Animal;
-import com.FirstApiChallenge.api.model.Veterinarian;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-
-
-import java.util.Set;
 
 public record TutorRequestDTO(
 
@@ -18,13 +13,14 @@ public record TutorRequestDTO(
         String name,
 
         @NotBlank(message = "email é obrigatório")
+        @Email(message = "email deve ser válido")
         String email,
 
         @NotBlank(message = "cpf é obrigatório")
         String cpf,
 
-        @NotNull(message = "numero de telefone é obrigatório")
-        @Positive(message = "o numero de telefone tem que ser maior que zero")
+        @NotBlank(message = "Número de telefone é obrigatório")
+        @Pattern(regexp = "\\d{10,11}", message = "Número de telefone deve conter 10 ou 11 dígitos")
         String phoneNumber,
 
         @NotBlank(message = "Senha é obrigatória")
