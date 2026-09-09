@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -49,18 +50,28 @@ public class LinkService {
         Tutor tutor = tutorRepository.findByCpf(tutorCpf)
                 .orElseThrow(() -> new CustomException("Tutor não encontrado para o CPF informado", HttpStatus.NOT_FOUND));
 
-        linkRepository.findByVeterinarianCrmvNumberAndTutorCpf(crmvNumber, tutorCpf)
-                .ifPresent(link -> {
-                    if (link.getStatus() == LinkStatus.ACCEPTED) {
-                        throw new CustomException("Você já possui vínculo ativo com este tutor", HttpStatus.CONFLICT);
-                    }
-                    if (link.getStatus() == LinkStatus.PENDING) {
-                        throw new CustomException("Já existe uma solicitação pendente para este tutor", HttpStatus.CONFLICT);
-                    }
-                });
+        Optional<VeterinarianTutorLink> existingLink =
+                linkRepository.findByVeterinarianCrmvNumberAndTutorCpf(crmvNumber, tutorCpf);
 
-        VeterinarianTutorLink newLink = new VeterinarianTutorLink(veterinarian, tutor);
-        VeterinarianTutorLink savedLink = linkRepository.save(newLink);
+        VeterinarianTutorLink link;
+
+        if (existingLink.isPresent()) {
+            link = existingLink.get();
+
+            if (link.getStatus() == LinkStatus.ACCEPTED) {
+                throw new CustomException("Você já possui vínculo ativo com este tutor", HttpStatus.CONFLICT);
+            }
+            if (link.getStatus() == LinkStatus.PENDING) {
+                throw new CustomException("Já existe uma solicitação pendente para este tutor", HttpStatus.CONFLICT);
+            }
+
+            link.setStatus(LinkStatus.PENDING);
+            link.setUpdatedAt(LocalDateTime.now());
+        } else {
+            link = new VeterinarianTutorLink(veterinarian, tutor);
+        }
+
+        VeterinarianTutorLink savedLink = linkRepository.save(link);
 
         // --- DISPARO DE NOTIFICAÇÕES ---
         // Notificação para o Veterinário
