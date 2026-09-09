@@ -157,7 +157,7 @@ class AppointmentServiceTests {
     }
 
     @Test
-    void confirmsCancelsAndCompletesOnlyWithRelatedUsers() {
+    void confirmsAndCancelsOnlyWithRelatedUsers() {
         var pending = appointmentService.create(
                 tutor.getCpf(),
                 new AppointmentRequestDTO(
@@ -184,15 +184,15 @@ class AppointmentServiceTests {
                 .toList()
                 .isEmpty());
         assertEquals(
-                AppointmentStatus.COMPLETED,
-                appointmentService.complete(pending.id(), veterinarian.getCpf()).status()
+                AppointmentStatus.CANCELLED,
+                appointmentService.cancelByVeterinarian(pending.id(), veterinarian.getCpf()).status()
         );
 
-        CustomException completedCancellation = assertThrows(
+        CustomException repeatedCancellation = assertThrows(
                 CustomException.class,
                 () -> appointmentService.cancelByTutor(pending.id(), tutor.getCpf())
         );
-        assertEquals(HttpStatus.BAD_REQUEST, completedCancellation.getStatus());
+        assertEquals(HttpStatus.BAD_REQUEST, repeatedCancellation.getStatus());
 
         var cancellable = appointmentService.create(
                 tutor.getCpf(),

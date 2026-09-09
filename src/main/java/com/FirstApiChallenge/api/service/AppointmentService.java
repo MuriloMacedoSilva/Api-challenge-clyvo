@@ -208,26 +208,6 @@ public class AppointmentService {
         return AppointmentResponseDTO.fromEntity(appointment);
     }
 
-    @Transactional
-    public AppointmentResponseDTO complete(Long appointmentId, String veterinarianCpf) {
-        Appointment appointment = findAppointment(appointmentId);
-        validateVeterinarian(appointment, veterinarianCpf);
-
-        if (appointment.getStatus() != AppointmentStatus.CONFIRMED) {
-            throw new CustomException("Apenas consultas confirmadas podem ser concluídas", HttpStatus.BAD_REQUEST);
-        }
-
-        changeStatus(appointment, AppointmentStatus.COMPLETED);
-
-        notificationService.createTutorNotification(
-                appointment.getTutor(),
-                "A consulta de " + appointment.getAnimal().getName() + " foi concluída.",
-                NotificationType.APPOINTMENT_COMPLETED
-        );
-
-        return AppointmentResponseDTO.fromEntity(appointment);
-    }
-
     private Appointment findAppointment(Long appointmentId) {
         return appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new CustomException("Agendamento não encontrado", HttpStatus.NOT_FOUND));

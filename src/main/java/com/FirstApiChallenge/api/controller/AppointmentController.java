@@ -70,10 +70,4 @@ public class AppointmentController {
         );
     }
 
-    @PatchMapping("/{appointmentId}/complete")
-    public ResponseEntity<AppointmentResponseDTO> complete(
-            @PathVariable Long appointmentId,
-            @RequestParam String veterinarianCpf) {
-        return ResponseEntity.ok(appointmentService.complete(appointmentId, veterinarianCpf));
-    }
 }
