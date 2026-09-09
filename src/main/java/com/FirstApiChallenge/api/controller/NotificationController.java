@@ -46,6 +46,18 @@ public class NotificationController {
         );
     }
 
+    @DeleteMapping("/tutor/{cpf}")
+    public ResponseEntity<Void> clearTutorNotifications(@PathVariable String cpf) {
+        notificationService.clearTutorNotifications(cpf);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/veterinarian/{cpf}")
+    public ResponseEntity<Void> clearVeterinarianNotifications(@PathVariable String cpf) {
+        notificationService.clearVeterinarianNotifications(cpf);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/read")
     public ResponseEntity<Void> markAsRead(@PathVariable Long id) {
         notificationService.markAsRead(id);

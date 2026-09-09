@@ -7,8 +7,6 @@ import jakarta.validation.constraints.Positive;
 
 public record AnimalDTO(
 
-        Long id,
-
         @NotBlank(message = "O nome do pet é obrigatório")
         String name,
 
@@ -38,7 +36,6 @@ public record AnimalDTO(
 
         Animal animal = new Animal();
 
-        animal.setId(this.id());
         animal.setName(this.name());
         animal.setWeight(this.weight());
         animal.setHeight(this.height());

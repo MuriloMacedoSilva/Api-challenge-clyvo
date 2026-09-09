@@ -189,13 +189,6 @@ public class TutorService {
                         )
                 );
 
-        if (tutor.getAnimals().isEmpty()) {
-            throw new CustomException(
-                    "Não há animais cadastrados",
-                    HttpStatus.NOT_FOUND
-            );
-        }
-
         return tutor.getAnimals();
     }
 

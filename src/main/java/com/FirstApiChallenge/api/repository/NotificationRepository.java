@@ -10,4 +10,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByTutorCpfOrderByCreatedAtDesc(String cpf);
 
     List<Notification> findByVeterinarianCpfOrderByCreatedAtDesc(String cpf);
+
+    void deleteByTutorCpf(String cpf);
+
+    void deleteByVeterinarianCpf(String cpf);
 }

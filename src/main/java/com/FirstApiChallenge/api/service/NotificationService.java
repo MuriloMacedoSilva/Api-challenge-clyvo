@@ -69,6 +69,16 @@ public class NotificationService {
     }
 
     @Transactional
+    public void clearTutorNotifications(String cpf) {
+        notificationRepository.deleteByTutorCpf(cpf);
+    }
+
+    @Transactional
+    public void clearVeterinarianNotifications(String cpf) {
+        notificationRepository.deleteByVeterinarianCpf(cpf);
+    }
+
+    @Transactional
     public void markAsRead(Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new CustomException("Notificação não encontrada", HttpStatus.NOT_FOUND));
