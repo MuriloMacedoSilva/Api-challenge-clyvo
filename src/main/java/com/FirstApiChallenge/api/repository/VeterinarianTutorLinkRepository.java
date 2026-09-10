@@ -26,6 +26,8 @@ public interface VeterinarianTutorLinkRepository extends JpaRepository<Veterinar
     // Método para buscar os links aceitos filtrando pelo CPF do Veterinário
     List<VeterinarianTutorLink> findByVeterinarianCpfAndStatus(String veterinarianCpf, LinkStatus status);
 
+    long countByVeterinarianCpfAndStatus(String veterinarianCpf, LinkStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select link

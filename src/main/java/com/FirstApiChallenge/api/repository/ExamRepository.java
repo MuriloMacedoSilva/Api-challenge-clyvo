@@ -25,4 +25,6 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
             Long animalId,
             ExamStatus status
     );
+
+    long countByMedicalRecordVeterinarianCpfAndStatus(String veterinarianCpf, ExamStatus status);
 }
