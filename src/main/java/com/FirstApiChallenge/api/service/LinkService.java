@@ -29,16 +29,16 @@ public class LinkService {
     private final VeterinarianTutorLinkRepository linkRepository;
     private final TutorRepository tutorRepository;
     private final VeterinarianRepository veterinarianRepository;
-    private final NotificationService notificationService;
+    private final NotificationPublisher notificationPublisher;
 
     public LinkService(VeterinarianTutorLinkRepository linkRepository,
                        TutorRepository tutorRepository,
                        VeterinarianRepository veterinarianRepository,
-                       NotificationService notificationService) {
+                       NotificationPublisher notificationPublisher) {
         this.linkRepository = linkRepository;
         this.tutorRepository = tutorRepository;
         this.veterinarianRepository = veterinarianRepository;
-        this.notificationService = notificationService;
+        this.notificationPublisher = notificationPublisher;
     }
 
     // 1. Veterinário busca tutor pelo CPF e envia a solicitação
@@ -75,14 +75,14 @@ public class LinkService {
 
         // --- DISPARO DE NOTIFICAÇÕES ---
         // Notificação para o Veterinário
-        notificationService.createVeterinarianNotification(
+        notificationPublisher.createVeterinarianNotification(
                 veterinarian,
                 "Solicitação de vínculo enviada para o tutor " + tutor.getName() + ". Status: não respondida",
                 NotificationType.LINK_REQUEST_SENT
         );
 
         // Notificação para o Tutor (passando o savedLink com o ID gerado)
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 tutor,
                 "Você recebeu uma solicitação de vínculo do veterinário Dr(a). " + veterinarian.getName(),
                 NotificationType.LINK_REQUEST_RECEIVED,
@@ -110,13 +110,13 @@ public class LinkService {
 
         // --- DISPARO DE NOTIFICAÇÕES DE RESPOSTA ---
         if (accept) {
-            notificationService.createVeterinarianNotification(
+            notificationPublisher.createVeterinarianNotification(
                     link.getVeterinarian(),
                     "O tutor " + link.getTutor().getName() + " aceitou sua solicitação de vínculo!",
                     NotificationType.LINK_REQUEST_ACCEPTED
             );
         } else {
-            notificationService.createVeterinarianNotification(
+            notificationPublisher.createVeterinarianNotification(
                     link.getVeterinarian(),
                     "O tutor " + link.getTutor().getName() + " recusou sua solicitação de vínculo.",
                     NotificationType.LINK_REQUEST_REJECTED

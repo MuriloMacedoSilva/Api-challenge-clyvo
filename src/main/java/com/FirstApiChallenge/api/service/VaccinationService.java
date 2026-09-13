@@ -2,7 +2,6 @@ package com.FirstApiChallenge.api.service;
 
 import com.FirstApiChallenge.api.dto.VaccinationRequestDTO;
 import com.FirstApiChallenge.api.dto.VaccinationResponseDTO;
-import com.FirstApiChallenge.api.enums.LinkStatus;
 import com.FirstApiChallenge.api.enums.NotificationType;
 import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.model.Animal;
@@ -13,7 +12,6 @@ import com.FirstApiChallenge.api.repository.AnimalRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VaccinationRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
-import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,22 +26,22 @@ public class VaccinationService {
     private final AnimalRepository animalRepository;
     private final TutorRepository tutorRepository;
     private final VeterinarianRepository veterinarianRepository;
-    private final VeterinarianTutorLinkRepository linkRepository;
-    private final NotificationService notificationService;
+    private final ClinicalAccessValidator accessValidator;
+    private final NotificationPublisher notificationPublisher;
 
     public VaccinationService(
             VaccinationRepository vaccinationRepository,
             AnimalRepository animalRepository,
             TutorRepository tutorRepository,
             VeterinarianRepository veterinarianRepository,
-            VeterinarianTutorLinkRepository linkRepository,
-            NotificationService notificationService) {
+            ClinicalAccessValidator accessValidator,
+            NotificationPublisher notificationPublisher) {
         this.vaccinationRepository = vaccinationRepository;
         this.animalRepository = animalRepository;
         this.tutorRepository = tutorRepository;
         this.veterinarianRepository = veterinarianRepository;
-        this.linkRepository = linkRepository;
-        this.notificationService = notificationService;
+        this.accessValidator = accessValidator;
+        this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
@@ -63,7 +61,7 @@ public class VaccinationService {
 
         Vaccination savedVaccination = vaccinationRepository.saveAndFlush(vaccination);
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 animal.getTutor(),
                 "A vacina \"" + vaccination.getVaccineName() + "\" foi registrada para "
                         + animal.getName() + ".",
@@ -100,12 +98,7 @@ public class VaccinationService {
         Tutor tutor = findTutor(tutorCpf);
         Animal animal = findAnimal(animalId);
 
-        if (!animal.getTutor().getId().equals(tutor.getId())) {
-            throw new CustomException(
-                    "Este animal não pertence ao tutor informado",
-                    HttpStatus.FORBIDDEN
-            );
-        }
+        accessValidator.requireTutorOwnership(tutor, animal);
 
         return mapVaccinations(vaccinationRepository.findByAnimalIdOrderByApplicationDateDesc(animalId));
     }
@@ -146,18 +139,7 @@ public class VaccinationService {
     }
 
     private void validateAcceptedLink(Veterinarian veterinarian, Tutor tutor) {
-        boolean hasAcceptedLink = linkRepository.existsByVeterinarianCpfAndTutorCpfAndStatus(
-                veterinarian.getCpf(),
-                tutor.getCpf(),
-                LinkStatus.ACCEPTED
-        );
-
-        if (!hasAcceptedLink) {
-            throw new CustomException(
-                    "Veterinário não possui vínculo aceito com o tutor deste animal",
-                    HttpStatus.FORBIDDEN
-            );
-        }
+        accessValidator.requireAcceptedLink(veterinarian, tutor);
     }
 
     private void validateRequest(VaccinationRequestDTO request) {

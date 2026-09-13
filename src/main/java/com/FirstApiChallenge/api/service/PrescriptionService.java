@@ -4,7 +4,6 @@ import com.FirstApiChallenge.api.dto.PrescriptionItemRequestDTO;
 import com.FirstApiChallenge.api.dto.PrescriptionRequestDTO;
 import com.FirstApiChallenge.api.dto.PrescriptionResponseDTO;
 import com.FirstApiChallenge.api.enums.AppointmentStatus;
-import com.FirstApiChallenge.api.enums.LinkStatus;
 import com.FirstApiChallenge.api.enums.NotificationType;
 import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.model.MedicalRecord;
@@ -16,7 +15,6 @@ import com.FirstApiChallenge.api.repository.MedicalRecordRepository;
 import com.FirstApiChallenge.api.repository.PrescriptionRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
-import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,22 +29,22 @@ public class PrescriptionService {
     private final MedicalRecordRepository medicalRecordRepository;
     private final TutorRepository tutorRepository;
     private final VeterinarianRepository veterinarianRepository;
-    private final VeterinarianTutorLinkRepository linkRepository;
-    private final NotificationService notificationService;
+    private final ClinicalAccessValidator accessValidator;
+    private final NotificationPublisher notificationPublisher;
 
     public PrescriptionService(
             PrescriptionRepository prescriptionRepository,
             MedicalRecordRepository medicalRecordRepository,
             TutorRepository tutorRepository,
             VeterinarianRepository veterinarianRepository,
-            VeterinarianTutorLinkRepository linkRepository,
-            NotificationService notificationService) {
+            ClinicalAccessValidator accessValidator,
+            NotificationPublisher notificationPublisher) {
         this.prescriptionRepository = prescriptionRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.tutorRepository = tutorRepository;
         this.veterinarianRepository = veterinarianRepository;
-        this.linkRepository = linkRepository;
-        this.notificationService = notificationService;
+        this.accessValidator = accessValidator;
+        this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
@@ -78,7 +76,7 @@ public class PrescriptionService {
 
         Prescription savedPrescription = prescriptionRepository.saveAndFlush(prescription);
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 record.getAppointment().getTutor(),
                 "Uma nova prescrição foi adicionada ao atendimento de "
                         + record.getAnimal().getName() + ".",
@@ -159,18 +157,7 @@ public class PrescriptionService {
     }
 
     private void validateAcceptedLink(Veterinarian veterinarian, Tutor tutor) {
-        boolean hasAcceptedLink = linkRepository.existsByVeterinarianCpfAndTutorCpfAndStatus(
-                veterinarian.getCpf(),
-                tutor.getCpf(),
-                LinkStatus.ACCEPTED
-        );
-
-        if (!hasAcceptedLink) {
-            throw new CustomException(
-                    "Veterinário não possui vínculo aceito com o tutor deste animal",
-                    HttpStatus.FORBIDDEN
-            );
-        }
+        accessValidator.requireAcceptedLink(veterinarian, tutor);
     }
 
     private void validateRequest(PrescriptionRequestDTO request) {

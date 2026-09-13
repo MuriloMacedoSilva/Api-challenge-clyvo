@@ -37,7 +37,7 @@ public class AppointmentService {
     private final AnimalRepository animalRepository;
     private final VeterinarianRepository veterinarianRepository;
     private final VeterinarianTutorLinkRepository linkRepository;
-    private final NotificationService notificationService;
+    private final NotificationPublisher notificationPublisher;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
@@ -45,13 +45,13 @@ public class AppointmentService {
             AnimalRepository animalRepository,
             VeterinarianRepository veterinarianRepository,
             VeterinarianTutorLinkRepository linkRepository,
-            NotificationService notificationService) {
+            NotificationPublisher notificationPublisher) {
         this.appointmentRepository = appointmentRepository;
         this.tutorRepository = tutorRepository;
         this.animalRepository = animalRepository;
         this.veterinarianRepository = veterinarianRepository;
         this.linkRepository = linkRepository;
-        this.notificationService = notificationService;
+        this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
@@ -110,7 +110,7 @@ public class AppointmentService {
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
 
-        notificationService.createVeterinarianNotification(
+        notificationPublisher.createVeterinarianNotification(
                 veterinarian,
                 "Nova solicitação de consulta para o animal " + animal.getName()
                         + " em " + formatDate(appointment.getScheduledAt()) + ".",
@@ -164,7 +164,7 @@ public class AppointmentService {
 
         changeStatus(appointment, AppointmentStatus.CONFIRMED);
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 appointment.getTutor(),
                 "Sua consulta para " + appointment.getAnimal().getName()
                         + " foi confirmada pelo Dr(a). " + appointment.getVeterinarian().getName() + ".",
@@ -181,7 +181,7 @@ public class AppointmentService {
         validateCancellation(appointment);
         changeStatus(appointment, AppointmentStatus.CANCELLED);
 
-        notificationService.createVeterinarianNotification(
+        notificationPublisher.createVeterinarianNotification(
                 appointment.getVeterinarian(),
                 "O tutor " + appointment.getTutor().getName() + " cancelou a consulta de "
                         + appointment.getAnimal().getName() + ".",
@@ -198,7 +198,7 @@ public class AppointmentService {
         validateCancellation(appointment);
         changeStatus(appointment, AppointmentStatus.CANCELLED);
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 appointment.getTutor(),
                 "O Dr(a). " + appointment.getVeterinarian().getName() + " cancelou a consulta de "
                         + appointment.getAnimal().getName() + ".",

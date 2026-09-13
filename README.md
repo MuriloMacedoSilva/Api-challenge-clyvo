@@ -8,8 +8,8 @@ Este projeto é uma API RESTful desenvolvida com Spring Boot, focada na gestão 
 - **Spring Boot 4.0.6**
 - **Spring Data JPA** (Persistência de dados)
 - **Banco de Dados:**
-  - **H2** (Em memória para desenvolvimento)
-  - **Oracle Database** (Driver `ojdbc11` para produção)
+  - **PostgreSQL 16** (desenvolvimento local persistente e produção)
+  - **H2** (somente testes automatizados)
 - **Lombok** (Redução de código boilerplate)
 - **SpringDoc OpenAPI** (Swagger para documentação da API)
 
@@ -42,9 +42,15 @@ As entidades principais são:
 
 ## Como Executar
 
-1. Certifique-se de ter o JDK 21 instalado.
-2. Utilize o Maven Wrapper para rodar o projeto:
+1. Certifique-se de ter o JDK 21 e o Docker instalados.
+2. Inicie o PostgreSQL local:
+   ```bash
+   docker compose up -d
+   ```
+3. Utilize o Maven Wrapper para rodar o projeto com o profile local default:
    ```bash
    ./mvnw spring-boot:run
    ```
-3. A documentação da API (Swagger) estará disponível em `/swagger-ui.html` (verifique a porta, geralmente 8080).
+4. A documentação da API (Swagger) estará disponível em `http://localhost:8080/swagger-ui.html`.
+
+As configurações locais aceitam `DB_URL`, `DB_USERNAME` e `DB_PASSWORD`, com defaults compatíveis com o `docker-compose.yml`. Consulte `.env.example`.

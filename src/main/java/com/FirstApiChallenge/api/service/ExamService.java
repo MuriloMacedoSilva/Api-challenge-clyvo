@@ -5,7 +5,6 @@ import com.FirstApiChallenge.api.dto.ExamResponseDTO;
 import com.FirstApiChallenge.api.dto.ExamResultRequestDTO;
 import com.FirstApiChallenge.api.enums.AppointmentStatus;
 import com.FirstApiChallenge.api.enums.ExamStatus;
-import com.FirstApiChallenge.api.enums.LinkStatus;
 import com.FirstApiChallenge.api.enums.NotificationType;
 import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.model.Animal;
@@ -18,7 +17,6 @@ import com.FirstApiChallenge.api.repository.ExamRepository;
 import com.FirstApiChallenge.api.repository.MedicalRecordRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
-import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +32,8 @@ public class ExamService {
     private final TutorRepository tutorRepository;
     private final VeterinarianRepository veterinarianRepository;
     private final AnimalRepository animalRepository;
-    private final VeterinarianTutorLinkRepository linkRepository;
-    private final NotificationService notificationService;
+    private final ClinicalAccessValidator accessValidator;
+    private final NotificationPublisher notificationPublisher;
 
     public ExamService(
             ExamRepository examRepository,
@@ -43,15 +41,15 @@ public class ExamService {
             TutorRepository tutorRepository,
             VeterinarianRepository veterinarianRepository,
             AnimalRepository animalRepository,
-            VeterinarianTutorLinkRepository linkRepository,
-            NotificationService notificationService) {
+            ClinicalAccessValidator accessValidator,
+            NotificationPublisher notificationPublisher) {
         this.examRepository = examRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.tutorRepository = tutorRepository;
         this.veterinarianRepository = veterinarianRepository;
         this.animalRepository = animalRepository;
-        this.linkRepository = linkRepository;
-        this.notificationService = notificationService;
+        this.accessValidator = accessValidator;
+        this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
@@ -81,7 +79,7 @@ public class ExamService {
 
         Exam savedExam = examRepository.save(exam);
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 record.getAppointment().getTutor(),
                 "Foi solicitado o exame \"" + abbreviate(exam.getExamName()) + "\" para "
                         + abbreviate(record.getAnimal().getName()) + ".",
@@ -132,7 +130,7 @@ public class ExamService {
         Exam savedExam = examRepository.saveAndFlush(exam);
         MedicalRecord record = exam.getMedicalRecord();
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 record.getAppointment().getTutor(),
                 "O resultado do exame \"" + abbreviate(exam.getExamName()) + "\" de "
                         + abbreviate(record.getAnimal().getName()) + " já está disponível.",
@@ -154,7 +152,7 @@ public class ExamService {
         Exam savedExam = examRepository.saveAndFlush(exam);
         MedicalRecord record = exam.getMedicalRecord();
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 record.getAppointment().getTutor(),
                 "O exame \"" + abbreviate(exam.getExamName()) + "\" de "
                         + abbreviate(record.getAnimal().getName()) + " foi cancelado.",
@@ -246,24 +244,11 @@ public class ExamService {
     }
 
     private void validateAcceptedLink(Veterinarian veterinarian, Tutor tutor) {
-        boolean hasAcceptedLink = linkRepository.existsByVeterinarianCpfAndTutorCpfAndStatus(
-                veterinarian.getCpf(),
-                tutor.getCpf(),
-                LinkStatus.ACCEPTED
-        );
-
-        if (!hasAcceptedLink) {
-            throw new CustomException(
-                    "Veterinário não possui vínculo aceito com o tutor deste animal",
-                    HttpStatus.FORBIDDEN
-            );
-        }
+        accessValidator.requireAcceptedLink(veterinarian, tutor);
     }
 
     private void validateTutorOwnership(Tutor tutor, Animal animal) {
-        if (!animal.getTutor().getId().equals(tutor.getId())) {
-            throw new CustomException("Este animal não pertence ao tutor informado", HttpStatus.FORBIDDEN);
-        }
+        accessValidator.requireTutorOwnership(tutor, animal);
     }
 
     private void validateRequestedStatus(Exam exam, String message) {

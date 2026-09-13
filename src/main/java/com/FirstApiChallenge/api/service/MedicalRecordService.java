@@ -3,7 +3,6 @@ package com.FirstApiChallenge.api.service;
 import com.FirstApiChallenge.api.dto.MedicalRecordRequestDTO;
 import com.FirstApiChallenge.api.dto.MedicalRecordResponseDTO;
 import com.FirstApiChallenge.api.enums.AppointmentStatus;
-import com.FirstApiChallenge.api.enums.LinkStatus;
 import com.FirstApiChallenge.api.enums.NotificationType;
 import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.model.Animal;
@@ -16,7 +15,6 @@ import com.FirstApiChallenge.api.repository.AppointmentRepository;
 import com.FirstApiChallenge.api.repository.MedicalRecordRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
-import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +30,8 @@ public class MedicalRecordService {
     private final TutorRepository tutorRepository;
     private final VeterinarianRepository veterinarianRepository;
     private final AnimalRepository animalRepository;
-    private final VeterinarianTutorLinkRepository linkRepository;
-    private final NotificationService notificationService;
+    private final ClinicalAccessValidator accessValidator;
+    private final NotificationPublisher notificationPublisher;
 
     public MedicalRecordService(
             MedicalRecordRepository medicalRecordRepository,
@@ -41,15 +39,15 @@ public class MedicalRecordService {
             TutorRepository tutorRepository,
             VeterinarianRepository veterinarianRepository,
             AnimalRepository animalRepository,
-            VeterinarianTutorLinkRepository linkRepository,
-            NotificationService notificationService) {
+            ClinicalAccessValidator accessValidator,
+            NotificationPublisher notificationPublisher) {
         this.medicalRecordRepository = medicalRecordRepository;
         this.appointmentRepository = appointmentRepository;
         this.tutorRepository = tutorRepository;
         this.veterinarianRepository = veterinarianRepository;
         this.animalRepository = animalRepository;
-        this.linkRepository = linkRepository;
-        this.notificationService = notificationService;
+        this.accessValidator = accessValidator;
+        this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
@@ -88,7 +86,7 @@ public class MedicalRecordService {
         appointment.setUpdatedAt(LocalDateTime.now());
         appointmentRepository.save(appointment);
 
-        notificationService.createTutorNotification(
+        notificationPublisher.createTutorNotification(
                 appointment.getTutor(),
                 "O atendimento de " + appointment.getAnimal().getName()
                         + " foi concluído e um novo registro foi adicionado ao histórico clínico.",
@@ -121,9 +119,7 @@ public class MedicalRecordService {
                 .orElseThrow(() -> new CustomException("Tutor não encontrado", HttpStatus.NOT_FOUND));
         Animal animal = findAnimal(animalId);
 
-        if (!animal.getTutor().getId().equals(tutor.getId())) {
-            throw new CustomException("Este animal não pertence ao tutor informado", HttpStatus.FORBIDDEN);
-        }
+        accessValidator.requireTutorOwnership(tutor, animal);
 
         return getAnimalHistory(animalId);
     }
@@ -163,18 +159,7 @@ public class MedicalRecordService {
     }
 
     private void validateAcceptedLink(Veterinarian veterinarian, Tutor tutor) {
-        boolean hasAcceptedLink = linkRepository.existsByVeterinarianCpfAndTutorCpfAndStatus(
-                veterinarian.getCpf(),
-                tutor.getCpf(),
-                LinkStatus.ACCEPTED
-        );
-
-        if (!hasAcceptedLink) {
-            throw new CustomException(
-                    "Veterinário não possui vínculo aceito com o tutor deste animal",
-                    HttpStatus.FORBIDDEN
-            );
-        }
+        accessValidator.requireAcceptedLink(veterinarian, tutor);
     }
 
     private void validateClinicalData(MedicalRecordRequestDTO request) {

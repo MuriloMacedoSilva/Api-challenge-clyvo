@@ -9,7 +9,6 @@ import com.FirstApiChallenge.api.model.Animal;
 import com.FirstApiChallenge.api.model.Tutor;
 import com.FirstApiChallenge.api.model.Veterinarian;
 import com.FirstApiChallenge.api.repository.AnimalRepository;
-import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.http.HttpStatus;
@@ -27,15 +26,12 @@ public class VeterinarianService {
 
     private final VeterinarianRepository veterinarianRepository;
 
-    private final TutorRepository tutorRepository;
-
     private final AnimalRepository animalRepository;
 
     private final VeterinarianTutorLinkRepository veterinarianTutorLinkRepository;
 
-    public VeterinarianService(VeterinarianRepository veterinarianRepository, TutorRepository tutorRepository, AnimalRepository animalRepository, VeterinarianTutorLinkRepository veterinarianTutorLinkRepository) {
+    public VeterinarianService(VeterinarianRepository veterinarianRepository, AnimalRepository animalRepository, VeterinarianTutorLinkRepository veterinarianTutorLinkRepository) {
         this.veterinarianRepository = veterinarianRepository;
-        this.tutorRepository = tutorRepository;
         this.animalRepository = animalRepository;
         this.veterinarianTutorLinkRepository = veterinarianTutorLinkRepository;
     }

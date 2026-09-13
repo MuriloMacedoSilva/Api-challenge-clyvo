@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
-public class NotificationService {
+public class NotificationService implements NotificationPublisher {
 
     private final NotificationRepository notificationRepository;
 
@@ -24,6 +24,7 @@ public class NotificationService {
     }
 
     // Criar notificação para Tutor COM vínculo associado
+    @Override
     @Transactional
     public void createTutorNotification(Tutor tutor, String message, NotificationType type, VeterinarianTutorLink link) {
         Notification notification = new Notification(message, type, tutor, link);
@@ -31,6 +32,7 @@ public class NotificationService {
     }
 
     // Criar notificação para Tutor SEM vínculo
+    @Override
     @Transactional
     public void createTutorNotification(Tutor tutor, String message, NotificationType type) {
         Notification notification = new Notification(message, type, tutor);
@@ -38,6 +40,7 @@ public class NotificationService {
     }
 
     // Criar notificação para Veterinário
+    @Override
     @Transactional
     public void createVeterinarianNotification(Veterinarian vet, String message, NotificationType type) {
         Notification notification = new Notification(message, type, vet);
