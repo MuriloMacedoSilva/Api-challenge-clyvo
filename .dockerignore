@@ -1,0 +1,10 @@
+.git
+.gitignore
+.idea
+.vscode
+.env
+target
+azure
+README.md
+AGENTS.md
+*.iml

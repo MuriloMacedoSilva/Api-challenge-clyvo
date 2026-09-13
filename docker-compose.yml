@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgres:16
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    image: clyvo-postgres:${IMAGE_TAG:-local}
     container_name: clyvo-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-clyvo}
@@ -10,13 +13,29 @@ services:
       - "5432:5432"
     volumes:
       - clyvo-postgres-data:/var/lib/postgresql/data
-      - ./demo-data.sql:/seed/demo-data.sql:ro
-      - ./demo-data-postgres.sql:/seed/demo-data-postgres.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clyvo-api:${IMAGE_TAG:-local}
+    container_name: clyvo-api
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-clyvo}
+      DB_USERNAME: ${POSTGRES_USER:-clyvo}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-clyvo}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   clyvo-postgres-data:

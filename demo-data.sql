@@ -26,16 +26,16 @@ DELETE FROM veterinarian;
 -- =====================================================
 
 INSERT INTO tutor (id, name, email, cpf, phone_number, password, role) VALUES
-    (1, 'Mariana Oliveira', 'mariana.oliveira@demo.clyvo.com', '12345678901', '11987654321', '123456', 'tutor'),
-    (2, 'Carlos Mendes', 'carlos.mendes@demo.clyvo.com', '23456789012', '11976543210', '123456', 'tutor'),
-    (3, 'Fernanda Costa', 'fernanda.costa@demo.clyvo.com', '34567890123', '11965432109', '123456', 'tutor'),
-    (4, 'Rafael Almeida', 'rafael.almeida@demo.clyvo.com', '45678901234', '11954321098', '123456', 'tutor'),
-    (5, 'Juliana Martins', 'juliana.martins@demo.clyvo.com', '56789012345', '11943210987', '123456', 'tutor'),
-    (6, 'Lucas Pereira', 'lucas.pereira@demo.clyvo.com', '67890123456', '11932109876', '123456', 'tutor'),
-    (7, 'Camila Rocha', 'camila.rocha@demo.clyvo.com', '78901234567', '11921098765', '123456', 'tutor'),
-    (8, 'Bruno Santos', 'bruno.santos@demo.clyvo.com', '89012345678', '11910987654', '123456', 'tutor'),
-    (9, 'Patricia Lima', 'patricia.lima@demo.clyvo.com', '90123456789', '11909876543', '123456', 'tutor'),
-    (10, 'Diego Nascimento', 'diego.nascimento@demo.clyvo.com', '11223344556', '11988776655', '123456', 'tutor');
+    (1, 'Mariana Oliveira', 'mariana.oliveira@demo.clyvo.com', '12345678901', '11987654321', '12345678', 'tutor'),
+    (2, 'Carlos Mendes', 'carlos.mendes@demo.clyvo.com', '23456789012', '11976543210', '12345678', 'tutor'),
+    (3, 'Fernanda Costa', 'fernanda.costa@demo.clyvo.com', '34567890123', '11965432109', '12345678', 'tutor'),
+    (4, 'Rafael Almeida', 'rafael.almeida@demo.clyvo.com', '45678901234', '11954321098', '12345678', 'tutor'),
+    (5, 'Juliana Martins', 'juliana.martins@demo.clyvo.com', '56789012345', '11943210987', '12345678', 'tutor'),
+    (6, 'Lucas Pereira', 'lucas.pereira@demo.clyvo.com', '67890123456', '11932109876', '12345678', 'tutor'),
+    (7, 'Camila Rocha', 'camila.rocha@demo.clyvo.com', '78901234567', '11921098765', '12345678', 'tutor'),
+    (8, 'Bruno Santos', 'bruno.santos@demo.clyvo.com', '89012345678', '11910987654', '12345678', 'tutor'),
+    (9, 'Patricia Lima', 'patricia.lima@demo.clyvo.com', '90123456789', '11909876543', '12345678', 'tutor'),
+    (10, 'Diego Nascimento', 'diego.nascimento@demo.clyvo.com', '11223344556', '11988776655', '12345678', 'tutor');
 
 -- =====================================================
 -- VETERINARIOS
@@ -45,10 +45,10 @@ INSERT INTO veterinarian (
     id, name, email, cpf, phone_number, password, role,
     crmv_number, crmv_state, cnpj
 ) VALUES
-    (1, 'Dr. Gabriel Martins', 'gabriel.martins@demo.clyvo.com', '98765432100', '11999887766', '123456', 'veterinarian', '12345', 'SP', '12345678000190'),
-    (2, 'Dra. Amanda Ribeiro', 'amanda.ribeiro@demo.clyvo.com', '87654321099', '11988776644', '123456', 'veterinarian', '23456', 'SP', '23456789000101'),
-    (3, 'Dr. Henrique Souza', 'henrique.souza@demo.clyvo.com', '76543210988', '11977665533', '123456', 'veterinarian', '34567', 'RJ', '34567890000112'),
-    (4, 'Dra. Beatriz Fernandes', 'beatriz.fernandes@demo.clyvo.com', '65432109877', '11966554422', '123456', 'veterinarian', '45678', 'MG', '45678901000123');
+    (1, 'Dr. Gabriel Martins', 'gabriel.martins@demo.clyvo.com', '98765432100', '11999887766', '12345678', 'veterinarian', '12345', 'SP', '12345678000190'),
+    (2, 'Dra. Amanda Ribeiro', 'amanda.ribeiro@demo.clyvo.com', '87654321099', '11988776644', '12345678', 'veterinarian', '23456', 'SP', '23456789000101'),
+    (3, 'Dr. Henrique Souza', 'henrique.souza@demo.clyvo.com', '76543210988', '11977665533', '12345678', 'veterinarian', '34567', 'RJ', '34567890000112'),
+    (4, 'Dra. Beatriz Fernandes', 'beatriz.fernandes@demo.clyvo.com', '65432109877', '11966554422', '12345678', 'veterinarian', '45678', 'MG', '45678901000123');
 
 -- =====================================================
 -- ANIMAIS
@@ -471,10 +471,10 @@ ALTER TABLE tb_messages ALTER COLUMN id RESTART WITH 39;
 -- Tutor principal
 -- Nome: Mariana Oliveira
 -- CPF: 12345678901
--- Senha: 123456
+-- Senha demonstrativa: 8 caracteres (consulte este arquivo localmente)
 
 -- Veterinario principal
 -- Nome: Dr. Gabriel Martins
 -- CPF: 98765432100
 -- CRMV: 12345/SP
--- Senha: 123456
+-- Senha demonstrativa: 8 caracteres (consulte este arquivo localmente)

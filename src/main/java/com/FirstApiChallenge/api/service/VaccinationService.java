@@ -78,19 +78,22 @@ public class VaccinationService {
             VaccinationRequestDTO request) {
         Vaccination vaccination = findVaccination(vaccinationId);
         Veterinarian veterinarian = findVeterinarian(veterinarianCpf);
-
-        if (!vaccination.getVeterinarian().getId().equals(veterinarian.getId())) {
-            throw new CustomException(
-                    "Esta vacinação não pertence ao veterinário informado",
-                    HttpStatus.FORBIDDEN
-            );
-        }
-
+        requireAuthor(vaccination, veterinarian);
         validateAcceptedLink(veterinarian, vaccination.getAnimal().getTutor());
         validateRequest(request);
         applyRequest(vaccination, request);
 
         return VaccinationResponseDTO.fromEntity(vaccinationRepository.saveAndFlush(vaccination));
+    }
+
+    @Transactional
+    public void delete(Long vaccinationId, String veterinarianCpf) {
+        Vaccination vaccination = findVaccination(vaccinationId);
+        Veterinarian veterinarian = findVeterinarian(veterinarianCpf);
+        requireAuthor(vaccination, veterinarian);
+        validateAcceptedLink(veterinarian, vaccination.getAnimal().getTutor());
+        vaccinationRepository.delete(vaccination);
+        vaccinationRepository.flush();
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +143,15 @@ public class VaccinationService {
 
     private void validateAcceptedLink(Veterinarian veterinarian, Tutor tutor) {
         accessValidator.requireAcceptedLink(veterinarian, tutor);
+    }
+
+    private void requireAuthor(Vaccination vaccination, Veterinarian veterinarian) {
+        if (!vaccination.getVeterinarian().getId().equals(veterinarian.getId())) {
+            throw new CustomException(
+                    "Esta vacinação não pertence ao veterinário informado",
+                    HttpStatus.FORBIDDEN
+            );
+        }
     }
 
     private void validateRequest(VaccinationRequestDTO request) {

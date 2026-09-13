@@ -6,6 +6,7 @@ import com.FirstApiChallenge.api.service.VaccinationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,6 +43,14 @@ public class VaccinationController {
             @RequestParam String veterinarianCpf,
             @RequestBody @Valid VaccinationRequestDTO request) {
         return ResponseEntity.ok(vaccinationService.update(vaccinationId, veterinarianCpf, request));
+    }
+
+    @DeleteMapping("/{vaccinationId}")
+    public ResponseEntity<Void> delete(
+            @PathVariable Long vaccinationId,
+            @RequestParam String veterinarianCpf) {
+        vaccinationService.delete(vaccinationId, veterinarianCpf);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/tutor/{tutorCpf}/animals/{animalId}")

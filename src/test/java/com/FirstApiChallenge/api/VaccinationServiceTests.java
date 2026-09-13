@@ -188,6 +188,63 @@ class VaccinationServiceTests {
     }
 
     @Test
+    void authorDeletesVaccination() {
+        var created = vaccinationService.create(
+                animal.getId(),
+                author.getCpf(),
+                request("V10", LocalDate.now(), null, null)
+        );
+
+        vaccinationService.delete(created.id(), author.getCpf());
+
+        assertFalse(vaccinationRepository.existsById(created.id()));
+    }
+
+    @Test
+    void otherLinkedVeterinarianCannotDeleteVaccination() {
+        var created = vaccinationService.create(
+                animal.getId(),
+                author.getCpf(),
+                request("V10", LocalDate.now(), null, null)
+        );
+        Veterinarian other = veterinarianRepository.save(
+                createVeterinarian("22233344455", "Vet B", "5678")
+        );
+        addAcceptedLink(other, tutor);
+
+        CustomException exception = assertThrows(CustomException.class, () -> vaccinationService.delete(
+                created.id(),
+                other.getCpf()
+        ));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+        assertTrue(vaccinationRepository.existsById(created.id()));
+    }
+
+    @Test
+    void authorCannotDeleteVaccinationWithoutAcceptedLink() {
+        var created = vaccinationService.create(
+                animal.getId(),
+                author.getCpf(),
+                request("V10", LocalDate.now(), null, null)
+        );
+        VeterinarianTutorLink link = linkRepository.findByVeterinarianCrmvNumberAndTutorCpf(
+                author.getCrmvNumber(),
+                tutor.getCpf()
+        ).orElseThrow();
+        link.setStatus(LinkStatus.REJECTED);
+        linkRepository.saveAndFlush(link);
+
+        CustomException exception = assertThrows(CustomException.class, () -> vaccinationService.delete(
+                created.id(),
+                author.getCpf()
+        ));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+        assertTrue(vaccinationRepository.existsById(created.id()));
+    }
+
+    @Test
     void tutorReadsHistoryOrderedByApplicationDateDescending() {
         vaccinationService.create(
                 animal.getId(),

@@ -1,0 +1,12 @@
+FROM postgres:16
+
+COPY database/script_bd.sql /docker-entrypoint-initdb.d/001-schema.sql
+COPY database/demo-verification.sql /seed/demo-verification.sql
+COPY demo-data.sql /seed/demo-data.sql
+COPY demo-data-postgres.sql /seed/demo-data-postgres.sql
+
+RUN chmod 0444 \
+    /docker-entrypoint-initdb.d/001-schema.sql \
+    /seed/demo-verification.sql \
+    /seed/demo-data.sql \
+    /seed/demo-data-postgres.sql
