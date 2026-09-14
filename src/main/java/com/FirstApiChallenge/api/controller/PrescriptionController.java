@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/prescriptions")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;

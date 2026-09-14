@@ -13,6 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/exams")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class ExamController {
 
     private final ExamService examService;

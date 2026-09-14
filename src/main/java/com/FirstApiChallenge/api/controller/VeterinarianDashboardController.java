@@ -3,13 +3,11 @@ package com.FirstApiChallenge.api.controller;
 import com.FirstApiChallenge.api.dto.VeterinarianDashboardResponseDTO;
 import com.FirstApiChallenge.api.service.VeterinarianDashboardService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/dashboards")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class VeterinarianDashboardController {
 
     private final VeterinarianDashboardService dashboardService;

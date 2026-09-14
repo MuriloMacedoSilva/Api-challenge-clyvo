@@ -14,6 +14,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/v1/links")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class LinkController {
 
     private final LinkService linkService;
