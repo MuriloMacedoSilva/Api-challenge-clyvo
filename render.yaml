@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: clyvo-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /tutor/ping
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: render
+      - key: JAVA_TOOL_OPTIONS
+        value: -Xms128m -Xmx384m

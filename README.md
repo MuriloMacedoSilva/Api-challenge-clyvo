@@ -4,7 +4,7 @@ Backend REST do CLYVO, uma aplicação veterinária que conecta Tutores, Veterin
 
 ## Descrição da Solução
 
-A API usa Java 21, Spring Boot 4.0.6, Spring MVC, Spring Data JPA/Hibernate e PostgreSQL 16. O profile `local` usa PostgreSQL, `prod` recebe conexão exclusivamente por variáveis de ambiente e valida o schema criado por `database/script_bd.sql`, e `test` usa H2 em memória.
+A API usa Java 21, Spring Boot 4.0.6, Spring MVC, Spring Data JPA/Hibernate e PostgreSQL 16. O profile `local` usa PostgreSQL, `prod` recebe conexão exclusivamente por variáveis de ambiente e valida o schema criado por `database/script_bd.sql`, `render` usa H2 em memória com seed automático de demonstração e `test` usa H2 em memória para a suíte automatizada.
 
 O deploy acadêmico validado segue a opção ACR + ACI aprovada pelo professor: um único Azure Container Instance/Container Group contém a API e o PostgreSQL. A API acessa o banco por `localhost:5432`; apenas a porta `8080` é pública. O PostgreSQL usa o filesystem interno do container.
 
@@ -133,9 +133,44 @@ O `Dockerfile.postgres` deriva de `postgres:16`. O schema é copiado para `/dock
 
 - `local`: `ddl-auto=update`, preservado para compatibilidade com bancos locais existentes.
 - `prod`: `ddl-auto=validate`; o schema deve existir antes da API iniciar.
+- `render`: `ddl-auto=create` sobre H2 em memória; cria um schema novo e a massa demo a cada inicialização.
 - `test`: `ddl-auto=create-drop` sobre H2 em memória.
 
 Não foi introduzido Flyway/Liquibase. Para esta entrega acadêmica, o entrypoint da imagem PostgreSQL cria o schema em volume vazio; migrations versionadas continuam recomendadas para produção real.
+
+## Deploy gratuito no Render
+
+O ambiente Render existe exclusivamente para o professor de Frontend testar a API sem depender da infraestrutura paga da Azure. Ele executa um Web Service Docker no plano Free, ativa o profile `render` e usa H2 em memória. Não crie Render Postgres nem configure `DB_URL`, `DB_USERNAME` ou `DB_PASSWORD` nesse serviço.
+
+O `render.yaml` permite criar o serviço como Blueprint. Ele reutiliza o `Dockerfile` da API, configura `SPRING_PROFILES_ACTIVE=render`, limita a JVM com `JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m` e usa `GET /tutor/ping` como health check. A aplicação escuta em `0.0.0.0` e usa a variável `PORT` fornecida pelo Render, com fallback local para `10000`.
+
+Para criar pelo Dashboard sem Blueprint:
+
+1. Crie um Web Service a partir deste repositório GitHub.
+2. Selecione o runtime Docker e o plano Free.
+3. Defina `SPRING_PROFILES_ACTIVE=render`.
+4. Opcionalmente, defina `JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m`; o Blueprint já inclui esse limite.
+5. Faça o deploy e acesse a URL `https://<nome-do-servico>.onrender.com`.
+
+Como alternativa, escolha New > Blueprint no Render e aponte para o repositório que contém `render.yaml`. O Blueprint cria somente a API, sem banco ou secrets externos.
+
+Credenciais fictícias criadas automaticamente:
+
+| Perfil | CPF | CRMV | Senha |
+|---|---|---|---|
+| Tutor demo (Mariana Oliveira) | `12345678901` | Não se aplica | `12345678` |
+| Veterinário demo (Dr. Gabriel Martins) | `98765432100` | `12345/SP` | `12345678` |
+
+O initializer exclusivo `RenderDemoDataInitializer`, ativado somente pelo profile `render`, usa repositories em uma transação para criar estados finais coerentes sem disparar notificações ou transições de negócio durante o boot. Antes de inserir, ele verifica o CPF do Tutor demo, evitando duplicação se for chamado novamente na mesma instância. A massa contém Luna, Mingau e Thor, vínculo aceito, consultas, prontuário, prescrição, exames, vacinas e uma conversa com mensagens. Esses dados deixam as listagens, os detalhes clínicos, o chat e o dashboard do Veterinário com conteúdo demonstrável.
+
+### Limitações do ambiente Render
+
+- O H2 é volátil e existe somente na memória do processo.
+- Restart, redeploy ou encerramento do serviço apaga os dados; o initializer recria automaticamente a mesma massa no próximo boot.
+- O serviço Free pode dormir após inatividade e a primeira requisição depois disso pode levar cerca de um minuto.
+- O Render não representa produção e não deve receber dados reais.
+- O deploy acadêmico oficial de DevOps continua sendo Azure ACR/ACI com PostgreSQL e permanece independente desta configuração.
+- O CORS amplo já declarado pelos controllers foi preservado, portanto o frontend web pode acessar a URL pública do Render sem cadastrar um domínio ainda desconhecido.
 
 ## Login Azure Manual
 
@@ -421,53 +456,4 @@ Se o Resource Group contiver apenas esta entrega, remova tudo para interromper c
 
 O script exige digitar o nome exato do Resource Group, executa `az group delete --yes` e confirma `az group exists: false`.
 
-## ORDEM FINAL VALIDADA PARA GRAVAR O VÍDEO
 
-1. Clone: `git clone https://github.com/MuriloMacedoSilva/Api-challenge-clyvo.git`.
-2. Entre no backend: `cd Api-challenge-clyvo`.
-3. Prepare secrets: `install -m 600 .env.example .env` e substitua todos os placeholders, inclusive `AZURE_SUBSCRIPTION_ID`.
-4. Torne os scripts executáveis, se necessário: `chmod +x wait-for-postgres.sh azure/scripts/*.sh`.
-5. Faça login manual: `az login`.
-6. Confira a subscription: `az account show`.
-7. Se necessário, selecione-a: `az account set --subscription "<ID_OU_NOME>"`.
-8. Valide o ambiente: `./azure/scripts/00-check-prerequisites.sh`.
-9. Crie Resource Group e ACR: `./azure/scripts/01-create-resources.sh`.
-10. Faça login ACR, build, tag e push das imagens: `./azure/scripts/02-build-push-images.sh`.
-11. Crie o Container Group via `az container create`: `./azure/scripts/03-deploy.sh`.
-12. Confira containers, IP e FQDN: `./azure/scripts/05-status.sh`.
-13. Veja os logs da API e PostgreSQL com os comandos da seção “Status, Logs e Exec”.
-14. Execute o seed manual: `./azure/scripts/04-seed-demo.sh`.
-15. Teste ping e OpenAPI: `./azure/scripts/06-test.sh`.
-16. Abra `http://<FQDN>:8080/swagger-ui/index.html`.
-17. Defina `BASE_URL=http://<FQDN>:8080`.
-18. Demonstre CREATE e READ de Animal com os comandos documentados.
-19. Entre no PostgreSQL via `az container exec` e execute o SELECT do Animal.
-20. Demonstre UPDATE de Animal e repita o SELECT.
-21. Demonstre as duas vacinações significativas com `/seed/demo-verification.sql`.
-22. Demonstre CREATE, READ, UPDATE e DELETE de Vaccination e os SELECTs correspondentes.
-23. Execute uma consulta GET adicional, como a listagem de Animals ou Vaccinations, e confronte com SELECT.
-24. Prove o usuário non-root com `az container exec ... --container-name clyvo-api --exec-command whoami`.
-25. Demonstre DELETE do Animal de vídeo e confirme com SELECT retornando zero linhas.
-26. Mostre novamente os logs dos dois containers.
-27. Opcionalmente remova todos os recursos: `./azure/scripts/99-destroy.sh`.
-
-## Estado de Validação
-
-### VALIDADO EM ENSAIO REAL
-
-- Estrutura multi-stage e Java 21 das imagens.
-- Diretiva `USER clyvo` e permissões de leitura/execução da API.
-- Espera autenticada pelo PostgreSQL antes do `java -jar`.
-- Separação entre DDL automático e seed manual.
-- Comunicação Compose por `postgres:5432` e ACI por `localhost:5432`.
-- Template com um Container Group, dois containers e somente `8080` pública.
-- Placeholders no YAML e obtenção dinâmica da credencial ACR.
-- DDL com 13 tabelas aceito por Hibernate `validate` em PostgreSQL 16.15.
-- Builds, pushes, ACI, seed, FQDN, Swagger, CRUD e SELECTs.
-- API non-root com resultado `clyvo`.
-
-### LIMITAÇÕES
-
-- O endpoint acadêmico usa HTTP sem TLS.
-- O banco usa filesystem interno do ACI e perde dados se o Container Group for recriado ou excluído.
-- O seed é destrutivo e destinado somente à demonstração.

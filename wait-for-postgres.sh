@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+if [ "${SPRING_PROFILES_ACTIVE:-}" = "render" ]; then
+    exec java -jar /app/app.jar
+fi
+
 : "${DB_URL:?DB_URL deve ser definida}"
 : "${DB_USERNAME:?DB_USERNAME deve ser definida}"
 : "${DB_PASSWORD:?DB_PASSWORD deve ser definida}"
