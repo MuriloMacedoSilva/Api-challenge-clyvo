@@ -2,6 +2,13 @@
 
 Backend REST do CLYVO, uma aplicação veterinária que conecta Tutores, Veterinários e Animais. O sistema organiza vínculos, consultas, prontuários, prescrições, exames, vacinações, notificações, conversas e indicadores do Veterinário.
 
+## Sumário
+
+- [Parte I: DevOps e Infraestrutura](#parte-i-devops-e-infraestrutura)
+- [Parte II: Desenvolvimento Java](#parte-ii-desenvolvimento-java)
+
+# Parte I: DevOps e Infraestrutura
+
 ## Descrição da Solução
 
 A API usa Java 21, Spring Boot 4.0.6, Spring MVC, Spring Data JPA/Hibernate e PostgreSQL 16. O profile `local` usa PostgreSQL, `prod` recebe conexão exclusivamente por variáveis de ambiente e valida o schema criado por `database/script_bd.sql`, `render` usa H2 em memória com seed automático de demonstração e `test` usa H2 em memória para a suíte automatizada.
@@ -456,4 +463,477 @@ Se o Resource Group contiver apenas esta entrega, remova tudo para interromper c
 
 O script exige digitar o nome exato do Resource Group, executa `az group delete --yes` e confirma `az group exists: false`.
 
+---
 
+# Parte II: Desenvolvimento Java
+
+## Visão Geral
+
+A API implementa os casos de uso do CLYVO em uma aplicação Spring Boot organizada por domínio e camadas. Os controllers expõem recursos REST, os services concentram regras de negócio e transações, e os repositories usam Spring Data JPA para persistência em PostgreSQL ou H2, conforme o profile ativo.
+
+Os fluxos atendem dois perfis:
+
+- **Tutor:** gerencia seus animais, vínculos, consultas, notificações, histórico clínico, vacinações e conversas.
+- **Veterinário:** acompanha Tutores vinculados, gerencia atendimentos e dados clínicos, registra vacinações, utiliza o chat e consulta indicadores operacionais.
+
+## Stack Java
+
+| Tecnologia | Versão ou escopo | Finalidade |
+|---|---|---|
+| Java | 21 | Linguagem e runtime da aplicação |
+| Spring Boot | 4.0.6 | Configuração, inicialização e gerenciamento da aplicação |
+| Spring WebMVC | Gerenciada pelo Spring Boot | Controllers e endpoints REST |
+| Spring Data JPA / Hibernate | Gerenciada pelo Spring Boot | Persistência e consultas |
+| Jakarta Bean Validation | Gerenciada pelo Spring Boot | Validação dos DTOs de entrada |
+| PostgreSQL | Driver runtime | Banco dos profiles `local` e `prod` |
+| H2 | Driver runtime | Banco dos profiles `render` e `test` |
+| Springdoc OpenAPI | 3.0.2 | OpenAPI e Swagger UI |
+| Lombok | Gerenciada pelo Spring Boot | Redução de código repetitivo nas classes Java |
+| Maven Wrapper | Maven 3.9.15 | Build e execução sem instalação global do Maven |
+
+O artefato Maven é `com.FirstApiChallenge:api:0.0.1-SNAPSHOT` e o pacote-base é `com.FirstApiChallenge.api`.
+
+## Arquitetura do Código
+
+```text
+src/main/java/com/FirstApiChallenge/api/
+|-- config/       # Inicialização exclusiva do ambiente Render
+|-- controller/   # Endpoints HTTP e montagem de ResponseEntity
+|-- dto/          # Contratos de entrada e saída
+|-- enums/        # Estados e tipos persistidos pelo domínio
+|-- exception/    # Exceções e tratamento global de erros
+|-- model/        # Entidades JPA
+|-- repository/   # Persistência, projections, consultas e locks
+`-- service/      # Casos de uso, autorização de domínio e transações
+```
+
+O fluxo principal de uma requisição segue:
+
+```text
+Cliente HTTP
+-> Controller
+-> Service
+-> Repository
+-> PostgreSQL ou H2
+```
+
+Decisões presentes no código:
+
+- controllers delegam regras de negócio aos services;
+- services usam `@Transactional` nas fronteiras que alteram o domínio;
+- repositories estendem interfaces do Spring Data JPA;
+- os módulos clínicos retornam DTOs, evitando expor grafos de entidades JPA;
+- listas vazias normalmente retornam `200 []`;
+- operações que criam dados clínicos e notificações usam a mesma transação;
+- associações clínicas são carregadas de forma `LAZY` e consultas específicas usam projections, `EntityGraph` ou locks quando necessário.
+
+## Modelo de Domínio
+
+A aplicação possui 13 entidades JPA:
+
+| Entidade | Papel e relacionamentos principais |
+|---|---|
+| `Tutor` | Responsável pelos animais; relacionamento `1:N` com `Animal` |
+| `Veterinarian` | Profissional associado a vínculos, consultas e registros clínicos |
+| `Animal` | Pertence a um Tutor; o nome é único dentro do mesmo Tutor |
+| `VeterinarianTutorLink` | Liga Veterinário e Tutor com estado `PENDING`, `ACCEPTED` ou `REJECTED` |
+| `Appointment` | Relaciona Animal, Tutor e Veterinário em uma consulta |
+| `MedicalRecord` | Prontuário de uma consulta; existe no máximo um por Appointment |
+| `Prescription` | Prescrição única de um prontuário |
+| `PrescriptionItem` | Medicamento ordenado pertencente a uma Prescription |
+| `Exam` | Exame solicitado a partir de um prontuário |
+| `Vaccination` | Registro longitudinal ligado diretamente a Animal e Veterinário |
+| `Notification` | Evento destinado a Tutor ou Veterinário |
+| `Conversation` | Conversa única para cada par Tutor/Veterinário |
+| `Message` | Mensagem pertencente a uma Conversation |
+
+Relacionamentos centrais:
+
+```text
+Tutor 1 ----- N Animal
+
+Veterinarian 1 ----- N VeterinarianTutorLink N ----- 1 Tutor
+
+Appointment N ----- 1 Animal
+Appointment N ----- 1 Tutor
+Appointment N ----- 1 Veterinarian
+
+MedicalRecord 1 ----- 1 Appointment
+MedicalRecord N ----- 1 Animal
+MedicalRecord N ----- 1 Veterinarian
+
+Prescription 1 ----- 1 MedicalRecord
+Prescription 1 ----- N PrescriptionItem
+
+Exam N ----- 1 MedicalRecord
+
+Vaccination N ----- 1 Animal
+Vaccination N ----- 1 Veterinarian
+
+Tutor 1 ----- N Conversation N ----- 1 Veterinarian
+Conversation 1 ----- N Message
+```
+
+## Autenticação Atual
+
+A autenticação é simplificada para fins acadêmicos.
+
+- não há Spring Security, JWT, sessão HTTP ou refresh token;
+- o login compara CPF e senha diretamente com os valores persistidos;
+- senhas ainda são armazenadas em texto puro;
+- DTOs antigos de Tutor e Veterinário ainda retornam o campo `password`;
+- CPF, CRMV e IDs recebidos em path ou query identificam o ator da operação;
+- os controllers aceitam CORS de qualquer origem.
+
+As validações de propriedade, autoria e vínculo `ACCEPTED` protegem regras de negócio específicas, mas não substituem autenticação e autorização reais. Use somente dados fictícios e não exponha esta versão como uma API de produção.
+
+## Funcionalidades e Regras
+
+### Tutores e Animais
+
+- cadastro e login simples de Tutor;
+- consulta de Tutor por CPF;
+- cadastro, listagem, edição e exclusão de Animal por ID;
+- um Tutor acessa apenas seus próprios Animais;
+- idade, peso e altura são obrigatórios e positivos;
+- um Tutor não pode ter dois Animais com o mesmo nome.
+
+### Veterinários e Vínculos
+
+- cadastro, login e consulta de Veterinário;
+- solicitação de vínculo por CRMV e CPF do Tutor;
+- aceite ou rejeição pelo Tutor;
+- uma solicitação rejeitada reutiliza o mesmo registro ao ser reenviada;
+- operações veterinárias sobre dados do Tutor exigem vínculo `ACCEPTED` quando indicado pelo domínio.
+
+### Consultas
+
+- o Tutor agenda apenas Animal próprio com Veterinário vinculado;
+- a data deve estar no futuro;
+- não pode existir outra consulta ativa do Veterinário no mesmo horário exato;
+- o Veterinário confirma consultas pendentes;
+- Tutor ou Veterinário relacionado pode cancelar consultas ativas;
+- a criação do prontuário conclui a consulta confirmada.
+
+Estados de Appointment:
+
+```text
+PENDING -> CONFIRMED -> COMPLETED
+    |           |
+    `-----------+-> CANCELLED
+```
+
+### Prontuários, Prescrições e Exames
+
+- existe no máximo um prontuário por consulta;
+- o prontuário registra diagnóstico, descrição, peso, temperatura e observações;
+- existe no máximo uma prescrição por prontuário;
+- uma prescrição contém um ou mais itens ordenados;
+- exames começam como `REQUESTED` e podem passar para `COMPLETED` ou `CANCELLED`;
+- apenas o Veterinário responsável, enquanto vinculado, altera os registros clínicos;
+- não há upload de laudos, imagens, PDFs ou anexos.
+
+### Vacinações
+
+- Vaccination pertence diretamente ao Animal e ao Veterinário autor;
+- a data de aplicação não pode estar no futuro;
+- a próxima dose é opcional e deve ser posterior à aplicação;
+- a mesma vacina pode aparecer em várias aplicações;
+- Veterinários vinculados podem consultar o histórico;
+- somente o autor, ainda vinculado, pode editar ou excluir o registro;
+- a criação gera uma notificação para o Tutor.
+
+### Chat
+
+- existe no máximo uma Conversation por par Tutor/Veterinário;
+- criar conversa e enviar mensagem exige vínculo `ACCEPTED`;
+- o histórico permanece disponível aos participantes após a inativação do vínculo;
+- novos envios ficam bloqueados enquanto o vínculo estiver inativo;
+- mensagens são ordenadas por envio e podem ser marcadas como lidas até um ID;
+- não existem edição, exclusão, anexos, grupos ou WebSocket.
+
+### Dashboard do Veterinário
+
+O dashboard é calculado sob demanda e não possui tabela própria. Ele apresenta:
+
+- Tutores com vínculo aceito;
+- pacientes ativos;
+- consultas do dia e contadores por status;
+- exames pendentes;
+- consultas concluídas nos últimos seis meses;
+- distribuição dos pacientes por espécie;
+- cinco próximas consultas pendentes ou confirmadas.
+
+## Endpoints
+
+### Tutor e Animal
+
+```text
+GET    /tutor/ping
+POST   /tutor
+POST   /tutor/login
+GET    /tutor/{cpf}
+POST   /tutor/{cpf}/create-animal
+GET    /tutor/{cpf}/read-animals
+PUT    /tutor/{cpf}/animals/{animalId}
+DELETE /tutor/{cpf}/animals/{animalId}
+```
+
+`POST /tutor/{cpf}/create-animal` recebe uma coleção de Animais, mesmo quando apenas um registro é criado.
+
+### Veterinário
+
+```text
+POST /veterinarian
+POST /veterinarian/login
+GET  /veterinarian/{cpf}
+GET  /veterinarian/{cpf}/tutors
+PUT  /veterinarian/{cpf}/animals/{animalId}
+```
+
+### Vínculos
+
+```text
+POST  /v1/links/request?crmvNumber=&tutorCpf=
+PATCH /v1/links/{linkId}/respond?tutorCpf=&accept=
+GET   /v1/links/pending?tutorCpf=
+GET   /v1/links/veterinarian/{veterinarianCpf}/tutor/{tutorCpf}/animals
+GET   /v1/links/veterinarian/{veterinarianCpf}/tutors
+```
+
+### Notificações
+
+```text
+GET    /v1/notifications/tutor/{cpf}
+GET    /v1/notifications/veterinarian/{cpf}
+DELETE /v1/notifications/tutor/{cpf}
+DELETE /v1/notifications/veterinarian/{cpf}
+PATCH  /v1/notifications/{id}/read
+```
+
+### Consultas
+
+```text
+POST  /v1/appointments/tutor/{tutorCpf}
+GET   /v1/appointments/tutor/{tutorCpf}
+GET   /v1/appointments/tutor/{tutorCpf}/veterinarians
+GET   /v1/appointments/veterinarian/{veterinarianCpf}
+PATCH /v1/appointments/{appointmentId}/confirm?veterinarianCpf=
+PATCH /v1/appointments/{appointmentId}/cancel/tutor?tutorCpf=
+PATCH /v1/appointments/{appointmentId}/cancel/veterinarian?veterinarianCpf=
+```
+
+### Prontuários
+
+```text
+POST /v1/medical-records/appointments/{appointmentId}?veterinarianCpf=
+PUT  /v1/medical-records/{recordId}?veterinarianCpf=
+GET  /v1/medical-records/tutor/{tutorCpf}/animals/{animalId}
+GET  /v1/medical-records/veterinarian/{veterinarianCpf}/animals/{animalId}
+```
+
+### Prescrições
+
+```text
+POST /v1/prescriptions/medical-records/{medicalRecordId}?veterinarianCpf=
+PUT  /v1/prescriptions/{prescriptionId}?veterinarianCpf=
+GET  /v1/prescriptions/tutor/{tutorCpf}/medical-records/{medicalRecordId}
+GET  /v1/prescriptions/veterinarian/{veterinarianCpf}/medical-records/{medicalRecordId}
+```
+
+Quando o prontuário não possui prescrição, os endpoints de consulta retornam `204 No Content`.
+
+### Exames
+
+```text
+POST  /v1/exams/medical-records/{medicalRecordId}?veterinarianCpf=
+PUT   /v1/exams/{examId}?veterinarianCpf=
+PATCH /v1/exams/{examId}/result?veterinarianCpf=
+PATCH /v1/exams/{examId}/cancel?veterinarianCpf=
+GET   /v1/exams/tutor/{tutorCpf}/medical-records/{medicalRecordId}
+GET   /v1/exams/veterinarian/{veterinarianCpf}/medical-records/{medicalRecordId}
+GET   /v1/exams/tutor/{tutorCpf}/animals/{animalId}
+GET   /v1/exams/veterinarian/{veterinarianCpf}/animals/{animalId}
+```
+
+### Vacinações
+
+```text
+POST   /v1/vaccinations/animals/{animalId}?veterinarianCpf=
+PUT    /v1/vaccinations/{vaccinationId}?veterinarianCpf=
+DELETE /v1/vaccinations/{vaccinationId}?veterinarianCpf=
+GET    /v1/vaccinations/tutor/{tutorCpf}/animals/{animalId}
+GET    /v1/vaccinations/veterinarian/{veterinarianCpf}/animals/{animalId}
+```
+
+### Chat
+
+```text
+POST  /v1/conversations/tutor/{tutorCpf}/veterinarians/{veterinarianCpf}
+POST  /v1/conversations/veterinarian/{veterinarianCpf}/tutors/{tutorCpf}
+GET   /v1/conversations/tutor/{tutorCpf}
+GET   /v1/conversations/veterinarian/{veterinarianCpf}
+GET   /v1/conversations/tutor/{tutorCpf}/contacts
+GET   /v1/conversations/veterinarian/{veterinarianCpf}/contacts
+GET   /v1/conversations/{conversationId}/tutor/{tutorCpf}
+GET   /v1/conversations/{conversationId}/veterinarian/{veterinarianCpf}
+GET   /v1/conversations/{conversationId}/messages/tutor/{tutorCpf}
+GET   /v1/conversations/{conversationId}/messages/veterinarian/{veterinarianCpf}
+POST  /v1/conversations/{conversationId}/messages/tutor/{tutorCpf}
+POST  /v1/conversations/{conversationId}/messages/veterinarian/{veterinarianCpf}
+PATCH /v1/conversations/{conversationId}/read/tutor/{tutorCpf}?upToMessageId=
+PATCH /v1/conversations/{conversationId}/read/veterinarian/{veterinarianCpf}?upToMessageId=
+```
+
+### Dashboard
+
+```text
+GET /v1/dashboards/veterinarian/{veterinarianCpf}
+```
+
+## Respostas e Tratamento de Erros
+
+As respostas de erro tratadas pelo `GlobalExceptionHandler` seguem, em geral, este formato:
+
+```json
+{
+  "timestamp": "2026-09-15T10:00:00",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Recurso não encontrado"
+}
+```
+
+Semântica usada pela API:
+
+| Status | Uso principal |
+|---|---|
+| `200 OK` | Consultas, atualizações e ações concluídas |
+| `201 Created` | Criação dos principais recursos |
+| `204 No Content` | Exclusões, respostas sem corpo e prescrição ausente |
+| `400 Bad Request` | Payload, validação ou transição inválida |
+| `403 Forbidden` | Propriedade, autoria ou vínculo insuficiente |
+| `404 Not Found` | Recurso principal inexistente |
+| `409 Conflict` | Duplicidade ou conflito de integridade |
+| `500 Internal Server Error` | Falha inesperada com mensagem genérica |
+
+Exceções ao envelope JSON:
+
+- os endpoints legados de login retornam `401` com texto simples quando a autenticação falha;
+- `GET /veterinarian/{cpf}` pode retornar `404` sem corpo;
+- coleções vazias normalmente retornam `200 []`.
+
+## Profiles Spring
+
+| Profile | Banco | Comportamento |
+|---|---|---|
+| `local` | PostgreSQL | Profile default, `ddl-auto=update` e SQL visível |
+| `prod` | PostgreSQL | Datasource obrigatório por variáveis e `ddl-auto=validate` |
+| `render` | H2 em memória | `ddl-auto=create` e seed automático de demonstração |
+| `test` | H2 em memória | `ddl-auto=create-drop`, ativado automaticamente nos testes |
+
+Os profiles são do Spring. Não existem profiles Maven definidos no `pom.xml`.
+
+## Desenvolvimento Local com Maven
+
+### Pré-requisitos
+
+- JDK 21;
+- Docker, caso o PostgreSQL seja iniciado pelo Compose;
+- porta `5432` disponível para o banco;
+- porta `8080` disponível para a API.
+
+O Maven não precisa ser instalado globalmente porque o projeto inclui `mvnw` e `mvnw.cmd`.
+
+### Banco em container e API pelo Maven
+
+O Compose usa `clyvo` como senha default do PostgreSQL, enquanto `application-local.properties` possui outro fallback. Alinhe a variável da aplicação ao iniciar pelo Maven:
+
+```bash
+docker compose up -d postgres
+DB_PASSWORD=clyvo ./mvnw spring-boot:run
+```
+
+Se um `.env` personalizado foi criado, exporte `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` para o processo Maven. O arquivo `.env` é lido pelo Docker Compose, mas não é carregado automaticamente pelo Spring Boot.
+
+Teste a aplicação:
+
+```bash
+curl http://localhost:8080/tutor/ping
+```
+
+### Build e JAR
+
+```bash
+./mvnw clean package
+java -jar target/api-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
+```
+
+Para empacotar sem executar a suíte:
+
+```bash
+./mvnw clean package -DskipTests
+```
+
+O profile `prod` exige obrigatoriamente `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` e valida o schema antes de iniciar.
+
+## OpenAPI e Swagger
+
+Com a aplicação em execução:
+
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+A especificação é inferida dos controllers e DTOs pelo Springdoc. O projeto ainda não possui descrições customizadas com `@Operation`, `@Tag` ou `@Schema`.
+
+## Testes Automatizados
+
+O profile `test` é ativado por `src/test/resources/application.properties` e usa H2 em memória. PostgreSQL e Docker não são necessários para executar a suíte:
+
+```bash
+./mvnw test
+```
+
+O código-fonte atual contém 57 testes distribuídos entre:
+
+| Área | Quantidade |
+|---|---:|
+| Chat | 15 |
+| Vacinação | 15 |
+| Dashboard do Veterinário | 13 |
+| Consultas | 3 |
+| Prontuários | 3 |
+| Prescrições | 3 |
+| Exames | 3 |
+| Contexto da aplicação | 1 |
+| Reexecução do seed H2 | 1 |
+
+A maior parte da suíte testa services com contexto Spring. O dashboard também possui cobertura HTTP com MockMvc. Não há testes dedicados para autenticação, Tutor, Veterinário, vínculos, notificações e para a maioria dos controllers.
+
+## Limitações Conhecidas
+
+- autenticação sem Spring Security, JWT ou sessão;
+- senhas persistidas e retornadas em texto puro;
+- CORS aberto para qualquer origem;
+- identidade baseada em CPF, CRMV e IDs informados pelo cliente;
+- ausência de paginação em listagens, históricos e mensagens;
+- ausência de Flyway ou Liquibase;
+- datas e horários sem tratamento uniforme de timezone;
+- CPF, e-mail, CNPJ e CRMV sem constraints de unicidade no banco;
+- conflito de agenda baseado apenas no mesmo `scheduledAt`, sem duração de consulta;
+- exclusão de Animal sujeita a conflito de FK quando já existem dados clínicos;
+- Swagger habilitado também no profile `prod`;
+- ausência de anexos, laudos, imagens e PDFs;
+- chat baseado em REST, sem WebSocket;
+- banco do ACI sem durabilidade após recriação do Container Group;
+- banco H2 do Render recriado a cada nova instância.
+
+## Próximas Evoluções Técnicas
+
+- implementar autenticação real com hash de senha e autorização por usuário autenticado;
+- adotar migrations versionadas para PostgreSQL;
+- adicionar paginação e filtros aos históricos;
+- padronizar datas, horários e timezone;
+- ampliar testes HTTP e testes de integração com PostgreSQL;
+- remover senhas dos DTOs antigos;
+- avaliar persistência externa para ambientes de produção.
