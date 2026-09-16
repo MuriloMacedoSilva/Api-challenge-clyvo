@@ -137,7 +137,7 @@ O `Dockerfile.postgres` deriva de `postgres:16`. O schema é copiado para `/dock
 
 ## Schema e Profiles
 
-`database/script_bd.sql` contém 13 tabelas correspondentes às 13 Entities atuais, com PKs identity, FKs, unicidades, `NOT NULL`, checks dos enums, `item_order`, índices e comentários PostgreSQL. Não contém `DROP`, `TRUNCATE` ou dados.
+`database/script_bd.sql` contém 14 tabelas correspondentes às 14 Entities atuais, com PKs identity, FKs, unicidades, `NOT NULL`, checks dos enums, `item_order`, índices e comentários PostgreSQL. Não contém `DROP`, `TRUNCATE` ou dados.
 
 - `local`: `ddl-auto=update`, preservado para compatibilidade com bancos locais existentes.
 - `prod`: `ddl-auto=validate`; o schema deve existir antes da API iniciar.
@@ -530,7 +530,7 @@ Decisões presentes no código:
 
 ## Modelo de Domínio
 
-A aplicação possui 13 entidades JPA:
+A aplicação possui 14 entidades JPA:
 
 | Entidade | Papel e relacionamentos principais |
 |---|---|
@@ -545,6 +545,7 @@ A aplicação possui 13 entidades JPA:
 | `Exam` | Exame solicitado a partir de um prontuário |
 | `Vaccination` | Registro longitudinal ligado diretamente a Animal e Veterinário |
 | `Notification` | Evento destinado a Tutor ou Veterinário |
+| `DevicePushToken` | Token Expo de um dispositivo, pertencente exclusivamente a Tutor ou Veterinário |
 | `Conversation` | Conversa única para cada par Tutor/Veterinário |
 | `Message` | Mensagem pertencente a uma Conversation |
 
@@ -723,6 +724,17 @@ DELETE /v1/notifications/tutor/{cpf}
 DELETE /v1/notifications/veterinarian/{cpf}
 PATCH  /v1/notifications/{id}/read
 ```
+
+As notificações persistidas continuam sendo a fonte de verdade. Como segundo canal, o backend publica push pelo Expo somente após o commit da transação; ausência de token, timeout ou rejeição externa não desfaz a operação de domínio nem a Notification interna. Tokens suportam múltiplos dispositivos, são únicos globalmente e podem ser reatribuídos na troca de conta. `DeviceNotRegistered` desativa somente se o token ainda pertencer ao destinatário original. O envio pós-commit permanece síncrono e sequencial, portanto vários timeouts podem prolongar uma resposta cujo domínio já foi confirmado.
+
+```text
+POST   /v1/push/tutor/{tutorCpf}/tokens
+DELETE /v1/push/tutor/{tutorCpf}/tokens?token=
+POST   /v1/push/veterinarian/{veterinarianCpf}/tokens
+DELETE /v1/push/veterinarian/{veterinarianCpf}/tokens?token=
+```
+
+O aplicativo usa `expo-notifications`; solicita permissão após autenticação, serializa registro/logout/troca de conta e abre a tela genérica de notificações ao toque, inclusive em cold start após restaurar a sessão. Respostas são deduplicadas por identifier e limpas após o consumo. Android usa o canal `clyvo-default` no plugin, runtime e payload. Push real exige `projectId` EAS configurado, build compatível e dispositivo físico. Não há receipts persistentes, deep link clínico ou push de Chat nesta versão.
 
 ### Consultas
 
@@ -908,7 +920,7 @@ O profile `test` é ativado por `src/test/resources/application.properties` e us
 ./mvnw test
 ```
 
-O código-fonte atual contém 76 testes distribuídos entre:
+O código-fonte atual contém 92 testes distribuídos entre:
 
 | Área | Quantidade |
 |---|---:|
@@ -922,8 +934,9 @@ O código-fonte atual contém 76 testes distribuídos entre:
 | Exames | 3 |
 | Contexto da aplicação | 1 |
 | Reexecução do seed H2 | 1 |
+| Push notifications e tokens | 16 |
 
-A maior parte da suíte testa services com contexto Spring. O dashboard também possui cobertura HTTP com MockMvc. Não há testes dedicados para autenticação, Tutor, Veterinário, vínculos, notificações e para a maioria dos controllers.
+A maior parte da suíte testa services com contexto Spring. Dashboard e registro de push também possuem cobertura HTTP com MockMvc. Não há testes dedicados para autenticação, Tutor, Veterinário, vínculos e para a maioria dos controllers.
 
 ## Limitações Conhecidas
 

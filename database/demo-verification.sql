@@ -2,7 +2,7 @@
 -- Execute com: psql --pset=pager=off -f /seed/demo-verification.sql, se o arquivo for copiado,
 -- ou cole as consultas na sessao psql aberta no container PostgreSQL.
 
--- Contagem das 13 tabelas depois do seed.
+-- Contagem das 14 tabelas depois do seed.
 SELECT 'tutor' AS table_name, COUNT(*) AS rows FROM tutor
 UNION ALL SELECT 'veterinarian', COUNT(*) FROM veterinarian
 UNION ALL SELECT 'animal', COUNT(*) FROM animal
@@ -14,6 +14,7 @@ UNION ALL SELECT 'tb_prescription_items', COUNT(*) FROM tb_prescription_items
 UNION ALL SELECT 'tb_exams', COUNT(*) FROM tb_exams
 UNION ALL SELECT 'tb_vaccinations', COUNT(*) FROM tb_vaccinations
 UNION ALL SELECT 'tb_notifications', COUNT(*) FROM tb_notifications
+UNION ALL SELECT 'tb_device_push_tokens', COUNT(*) FROM tb_device_push_tokens
 UNION ALL SELECT 'tb_conversations', COUNT(*) FROM tb_conversations
 UNION ALL SELECT 'tb_messages', COUNT(*) FROM tb_messages
 ORDER BY table_name;

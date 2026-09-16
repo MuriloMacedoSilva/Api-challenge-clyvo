@@ -8,6 +8,7 @@
 -- =====================================================
 
 DELETE FROM tb_messages;
+DELETE FROM tb_device_push_tokens;
 DELETE FROM tb_notifications;
 DELETE FROM tb_prescription_items;
 DELETE FROM tb_exams;
@@ -427,6 +428,7 @@ ALTER TABLE veterinarian ALTER COLUMN id RESTART WITH 5;
 ALTER TABLE animal ALTER COLUMN id RESTART WITH 20;
 ALTER TABLE tb_veterinarian_tutor_links ALTER COLUMN id RESTART WITH 17;
 ALTER TABLE tb_notifications ALTER COLUMN id RESTART WITH 22;
+ALTER TABLE tb_device_push_tokens ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE tb_appointments ALTER COLUMN id RESTART WITH 26;
 ALTER TABLE tb_medical_records ALTER COLUMN id RESTART WITH 14;
 ALTER TABLE tb_prescriptions ALTER COLUMN id RESTART WITH 9;
