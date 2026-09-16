@@ -1,6 +1,6 @@
 # CLYVO API
 
-Backend REST do CLYVO, uma aplicação veterinária que conecta Tutores, Veterinários e Animais. O sistema organiza vínculos, consultas, prontuários, prescrições, exames, vacinações, notificações, conversas e indicadores do Veterinário.
+Backend REST do CLYVO, uma aplicação veterinária que conecta Tutores, Veterinários e Animais. O sistema organiza vínculos, consultas, prontuários, prescrições, exames, vacinações, notificações, conversas e dashboards analíticos do Tutor e do Veterinário.
 
 ## Sumário
 
@@ -24,6 +24,7 @@ O deploy acadêmico validado segue a opção ACR + ACI aprovada pelo professor: 
 - Acompanhamento de tratamento, prescrições, exames e vacinações.
 - Gestão de consultas e organização das informações de saúde animal.
 - Indicadores operacionais para apoiar a tomada de decisão veterinária.
+- Home consolidada para o Tutor acompanhar pets, consultas e atividades clínicas recentes.
 
 ## Arquitetura Cloud
 
@@ -168,7 +169,7 @@ Credenciais fictícias criadas automaticamente:
 | Tutor demo (Mariana Oliveira) | `12345678901` | Não se aplica | `12345678` |
 | Veterinário demo (Dr. Gabriel Martins) | `98765432100` | `12345/SP` | `12345678` |
 
-O initializer exclusivo `RenderDemoDataInitializer`, ativado somente pelo profile `render`, usa repositories em uma transação para criar estados finais coerentes sem disparar notificações ou transições de negócio durante o boot. Antes de inserir, ele verifica o CPF do Tutor demo, evitando duplicação se for chamado novamente na mesma instância. A massa contém Luna, Mingau e Thor, vínculo aceito, consultas, prontuário, prescrição, exames, vacinas e uma conversa com mensagens. Esses dados deixam as listagens, os detalhes clínicos, o chat e o dashboard do Veterinário com conteúdo demonstrável.
+O initializer exclusivo `RenderDemoDataInitializer`, ativado somente pelo profile `render`, usa repositories em uma transação para criar estados finais coerentes sem disparar notificações ou transições de negócio durante o boot. Antes de inserir, ele verifica o CPF do Tutor demo, evitando duplicação se for chamado novamente na mesma instância. A massa contém Luna, Mingau e Thor, vínculo aceito, consultas, prontuário, prescrição, exames, vacinas e uma conversa com mensagens. Esses dados deixam as listagens, os detalhes clínicos, o chat e os dashboards do Tutor e do Veterinário com conteúdo demonstrável.
 
 ### Limitações do ambiente Render
 
@@ -664,6 +665,18 @@ O dashboard é calculado sob demanda e não possui tabela própria. Ele apresent
 - distribuição dos pacientes por espécie;
 - cinco próximas consultas pendentes ou confirmadas.
 
+### Dashboard do Tutor
+
+O dashboard também é calculado sob demanda, sem tabela ou cache próprio. Ele apresenta:
+
+- quantidade de pets, consultas de hoje e consultas pendentes;
+- Veterinários com vínculo aceito;
+- exames solicitados e registros vacinais cuja próxima dose está prevista para hoje ou data anterior;
+- a próxima consulta pendente ou confirmada;
+- até cinco atividades recentes derivadas de consultas concluídas, prontuários, prescrições, resultados de exame e vacinações.
+
+A métrica vacinal é uma contagem objetiva de registros por `nextDoseDate`; ela não representa diagnóstico de atraso, cobertura ou vacinação completa.
+
 ## Endpoints
 
 ### Tutor e Animal
@@ -789,6 +802,7 @@ PATCH /v1/conversations/{conversationId}/read/veterinarian/{veterinarianCpf}?upT
 
 ```text
 GET /v1/dashboards/veterinarian/{veterinarianCpf}
+GET /v1/dashboards/tutor/{tutorCpf}
 ```
 
 ## Respostas e Tratamento de Erros
@@ -894,13 +908,14 @@ O profile `test` é ativado por `src/test/resources/application.properties` e us
 ./mvnw test
 ```
 
-O código-fonte atual contém 57 testes distribuídos entre:
+O código-fonte atual contém 76 testes distribuídos entre:
 
 | Área | Quantidade |
 |---|---:|
 | Chat | 15 |
 | Vacinação | 15 |
 | Dashboard do Veterinário | 13 |
+| Dashboard do Tutor | 19 |
 | Consultas | 3 |
 | Prontuários | 3 |
 | Prescrições | 3 |

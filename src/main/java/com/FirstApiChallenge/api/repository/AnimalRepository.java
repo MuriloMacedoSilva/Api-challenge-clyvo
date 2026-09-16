@@ -17,6 +17,8 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     boolean existsByTutorIdAndNameIgnoreCase(Long tutorId, String name);
 
+    long countByTutorCpf(String tutorCpf);
+
     @Query("""
             select count(animal.id)
             from Animal animal

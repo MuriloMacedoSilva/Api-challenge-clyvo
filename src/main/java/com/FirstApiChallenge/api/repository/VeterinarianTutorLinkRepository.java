@@ -28,6 +28,8 @@ public interface VeterinarianTutorLinkRepository extends JpaRepository<Veterinar
 
     long countByVeterinarianCpfAndStatus(String veterinarianCpf, LinkStatus status);
 
+    long countByTutorCpfAndStatus(String tutorCpf, LinkStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select link
