@@ -2,6 +2,7 @@ package com.FirstApiChallenge.api.repository;
 
 import com.FirstApiChallenge.api.model.MedicalRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +18,9 @@ public interface MedicalRecordRepository extends JpaRepository<MedicalRecord, Lo
     boolean existsByAppointmentId(Long appointmentId);
 
     List<MedicalRecord> findByAnimalIdOrderByCreatedAtDesc(Long animalId);
+
+    @EntityGraph(attributePaths = "veterinarian")
+    List<MedicalRecord> findByAnimalIdOrderByCreatedAtDesc(Long animalId, Pageable pageable);
 
     @Query("""
             select record.id as referenceId,

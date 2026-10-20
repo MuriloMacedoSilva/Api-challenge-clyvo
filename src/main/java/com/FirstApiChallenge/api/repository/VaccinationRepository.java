@@ -16,6 +16,8 @@ public interface VaccinationRepository extends JpaRepository<Vaccination, Long> 
 
     List<Vaccination> findByAnimalIdOrderByApplicationDateDesc(Long animalId);
 
+    List<Vaccination> findByAnimalIdOrderByApplicationDateDesc(Long animalId, Pageable pageable);
+
     List<Vaccination> findByAnimalIdAndNextDoseDateGreaterThanEqualOrderByNextDoseDateAsc(
             Long animalId,
             LocalDate date

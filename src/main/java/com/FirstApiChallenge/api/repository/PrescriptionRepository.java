@@ -2,6 +2,7 @@ package com.FirstApiChallenge.api.repository;
 
 import com.FirstApiChallenge.api.model.Prescription;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +16,9 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, Long
     Optional<Prescription> findByMedicalRecordId(Long medicalRecordId);
 
     boolean existsByMedicalRecordId(Long medicalRecordId);
+
+    @EntityGraph(attributePaths = {"medicalRecord.veterinarian", "items"})
+    List<Prescription> findByMedicalRecordIdIn(List<Long> medicalRecordIds);
 
     @Query("""
             select prescription.id as referenceId,

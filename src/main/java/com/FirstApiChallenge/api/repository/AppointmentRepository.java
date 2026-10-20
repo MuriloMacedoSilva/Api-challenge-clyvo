@@ -19,6 +19,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     List<Appointment> findByVeterinarianCpfOrderByScheduledAtAsc(String veterinarianCpf);
 
+    @EntityGraph(attributePaths = "veterinarian")
+    List<Appointment> findTop3ByAnimalIdAndScheduledAtGreaterThanEqualAndStatusInOrderByScheduledAtAsc(
+            Long animalId,
+            LocalDateTime scheduledAt,
+            Collection<AppointmentStatus> statuses
+    );
+
+    @EntityGraph(attributePaths = "veterinarian")
+    List<Appointment> findTop5ByAnimalIdAndScheduledAtLessThanAndStatusOrderByScheduledAtDesc(
+            Long animalId,
+            LocalDateTime scheduledAt,
+            AppointmentStatus status
+    );
+
     boolean existsByVeterinarianIdAndScheduledAtAndStatusIn(
             Long veterinarianId,
             LocalDateTime scheduledAt,

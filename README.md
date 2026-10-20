@@ -678,7 +678,30 @@ O dashboard também é calculado sob demanda, sem tabela ou cache próprio. Ele 
 
 A métrica vacinal é uma contagem objetiva de registros por `nextDoseDate`; ela não representa diagnóstico de atraso, cobertura ou vacinação completa.
 
+### CLYVO AI
+
+O endpoint de IA para Tutor recebe somente a pergunta. O Java valida Tutor, Animal e propriedade, monta contexto clinico limitado e chama `POST /api/v1/ai/chat` do microsservico .NET por meio do `ClyvoAiClient`. O .NET nao acessa o banco e nao recebe CPF, senha, telefone, e-mail ou entidades JPA.
+
+- `CLYVO_AI_URL` configura a URL base; o fallback local e `http://localhost:5283`;
+- o timeout da chamada e 130 segundos;
+- sao enviados no maximo 5 prontuarios, prescricoes desses prontuarios, 5 exames, 10 vacinacoes e 5 consultas relevantes;
+- indisponibilidade retorna `503`, timeout retorna `504` e resposta invalida do provider retorna `502`.
+
 ## Endpoints
+
+### Inteligencia Artificial
+
+```text
+POST /v1/ai/tutor/{tutorCpf}/animals/{animalId}
+```
+
+Body:
+
+```json
+{
+  "question": "Resuma o historico recente da Luna"
+}
+```
 
 ### Tutor e Animal
 
@@ -920,10 +943,12 @@ O profile `test` é ativado por `src/test/resources/application.properties` e us
 ./mvnw test
 ```
 
-O código-fonte atual contém 92 testes distribuídos entre:
+O código-fonte atual contém 115 testes distribuídos entre:
 
 | Área | Quantidade |
 |---|---:|
+| Orquestração CLYVO AI | 15 |
+| Client HTTP CLYVO AI | 8 |
 | Chat | 15 |
 | Vacinação | 15 |
 | Dashboard do Veterinário | 13 |

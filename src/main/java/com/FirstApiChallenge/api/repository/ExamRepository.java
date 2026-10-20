@@ -23,6 +23,8 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
 
     List<Exam> findByMedicalRecordAnimalIdOrderByRequestDateDesc(Long animalId);
 
+    List<Exam> findByMedicalRecordAnimalIdOrderByRequestDateDesc(Long animalId, Pageable pageable);
+
     List<Exam> findByMedicalRecordAnimalIdAndStatusOrderByRequestDateDesc(
             Long animalId,
             ExamStatus status
