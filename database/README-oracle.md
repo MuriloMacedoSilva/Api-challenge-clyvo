@@ -6,6 +6,19 @@
 
 O arquivo não foi executado no Oracle institucional. Ele não contém dados, `DROP`, `TRUNCATE`, packages, procedures, functions ou triggers. O SQL acadêmico original em `../../../database/2TDSA_2024_CodigoSql_Integrantes.sql` permanece separado e inalterado.
 
+## Ambiente institucional confirmado
+
+| Item | Valor |
+|---|---|
+| Banco | Oracle Database 19c Enterprise Edition |
+| Usuário/schema | `RM566462` |
+| `NLS_CHARACTERSET` | `AL32UTF8` |
+| `NLS_NCHAR_CHARACTERSET` | `AL16UTF16` |
+| `MAX_STRING_SIZE` | `STANDARD` |
+| Privilégios informados | `CREATE TABLE`, `CREATE PROCEDURE`, `CREATE TRIGGER`, `CREATE SEQUENCE`, `CREATE VIEW` |
+
+O inventário informado de `USER_OBJECTS` contém objetos de projetos anteriores, incluindo `CLIENTE`, `PEDIDO`, `PRODUTO` e tabelas de IoT, mas nenhuma das 14 tabelas canônicas do CLYVO. Isso elimina colisão conhecida de tabelas, mas não substitui a verificação específica de constraints, índices, quota e tablespace imediatamente antes da execução.
+
 ## Objetos planejados
 
 ### Tabelas e entidades
@@ -48,10 +61,28 @@ O SQL acadêmico possui seis tabelas: `TB_TUTOR`, `TB_VETERINARIO`, `TB_ANIMAL`,
 | `timestamp(6) without time zone` | `TIMESTAMP(6)` | Preserva a semântica local de `LocalDateTime`, sem fuso. |
 | `date` de vacinação | `DATE` | O driver deve mapear `LocalDate`; Oracle `DATE` também comporta hora. |
 | `text` de `Animal.history` | `CLOB` | Oracle não possui tipo `TEXT`. |
-| `varchar(n)` | `VARCHAR2(n CHAR)` | Limites são expressos em caracteres, não bytes. |
+| `varchar(n)` | `VARCHAR2(n CHAR)` | Preserva o limite lógico JPA em caracteres, sujeito ao teto físico de 4000 bytes. |
 | Índice parcial de unread | Índice composto incluindo `IS_READ` | Oracle 19c não oferece `CREATE INDEX ... WHERE`. |
 
-Campos limitados a 4000 caracteres permanecem `VARCHAR2(4000 CHAR)` para refletir as anotações JPA atuais. Mesmo com semântica `CHAR`, Oracle aplica limites físicos em bytes conforme o charset e `MAX_STRING_SIZE`; textos multibyte próximos de 4000 caracteres podem exceder o limite. Migrar esses campos para `CLOB` exigirá alinhar as entidades com `@Lob` em uma fase posterior.
+Com `MAX_STRING_SIZE=STANDARD`, tanto `VARCHAR2(4000 CHAR)` quanto `VARCHAR2(2000 CHAR)` são declarações válidas no Oracle 19c. O número declarado não pode ultrapassar 4000, independentemente de `BYTE` ou `CHAR`. Nenhuma definição do DDL ultrapassa esse limite e, portanto, não há declaração conhecida que cause `ORA-00910` durante o `CREATE TABLE`.
+
+O teto do valor armazenado continua sendo 4000 bytes. Em `AL32UTF8`, um caractere pode consumir de 1 a 4 bytes. Assim, `CHAR` preserva a validação lógica de quantidade de caracteres, mas não garante que toda combinação possível até o limite declarado caiba fisicamente. Um valor que respeite a quantidade de caracteres, mas ultrapasse 4000 bytes, será rejeitado normalmente com `ORA-12899`; Oracle não o trunca silenciosamente.
+
+`AL16UTF16` não afeta este DDL porque nenhuma coluna usa `NCHAR`, `NVARCHAR2` ou `NCLOB`.
+
+As colunas expostas a essa diferença são:
+
+| Tabela.coluna | Declaração | Limite JPA atual |
+|---|---|---|
+| `TB_MEDICAL_RECORDS.DESCRIPTION` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
+| `TB_MEDICAL_RECORDS.OBSERVATIONS` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
+| `TB_PRESCRIPTIONS.INSTRUCTIONS` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
+| `TB_EXAMS.RESULT` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
+| `TB_EXAMS.OBSERVATIONS` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
+| `TB_VACCINATIONS.OBSERVATIONS` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
+| `TB_MESSAGES.CONTENT` | `VARCHAR2(2000 CHAR)` | 2000 caracteres |
+
+Em cenário extremo com caracteres de 4 bytes, o teto físico pode ser atingido com aproximadamente 1000 caracteres. Trocar essas colunas para `CLOB` seria a única forma de garantir os limites lógicos completos para qualquer conteúdo Unicode, mas quebraria a equivalência de tipo esperada pelas entidades atuais e exigiria alteração Java com `@Lob`. Como esta fase proíbe alteração Java, o DDL mantém `VARCHAR2(... CHAR)` e registra o risco para decisão coordenada futura.
 
 O uso de `FLOAT(24)` deve ser testado com valores limítrofes, arredondamento e o driver JDBC escolhido. PostgreSQL `real` e Java `Float` seguem IEEE-754, enquanto Oracle `FLOAT` usa a representação numérica do Oracle e não preserva valores especiais como `NaN` e infinito com a mesma semântica.
 
@@ -69,7 +100,7 @@ Esta fase não modifica Java. Antes de usar `spring.jpa.hibernate.ddl-auto=valid
 4. Substituir `Animal.history` com `columnDefinition = "TEXT"` por um mapeamento portátil de `CLOB`, normalmente `@Lob`, porque `TEXT` não existe no Oracle.
 5. Validar com Hibernate os mapeamentos `boolean -> NUMBER(1)`, `Float -> FLOAT(24)`, identity e `LocalDate -> DATE` usando o driver escolhido.
 6. Testar as queries derivadas e JPQL no Oracle, especialmente paginação/limite, locks pessimistas e ordenações.
-7. Decidir se os campos atuais de 4000 caracteres continuarão `VARCHAR2` ou migrarão para `CLOB` com alteração JPA correspondente.
+7. Decidir se os campos atuais de 2000/4000 caracteres continuarão sujeitos ao teto de 4000 bytes ou migrarão para `CLOB` com alteração JPA correspondente.
 
 O DDL não adiciona unicidade para CPF, e-mail, CRMV ou CNPJ porque as entidades e o DDL PostgreSQL atuais não a declaram. Alterar essa integridade exige decisão funcional, inspeção de dados e mudança coordenada, não uma divergência silenciosa apenas no Oracle.
 
@@ -96,19 +127,69 @@ Functions, procedures e trigger do trabalho acadêmico referenciam as tabelas ac
 
 Oracle executa DDL com commits implícitos. Portanto, a verificação deve ocorrer antes da execução, na mesma conta que será proprietária dos objetos.
 
-### 1. Confirmar versão e parâmetros relevantes
+Todas as consultas desta seção são somente leitura.
+
+### 1. Confirmar conta, versão e parâmetros relevantes
 
 ```sql
 SELECT banner_full FROM v$version WHERE banner_full LIKE 'Oracle Database%';
+SELECT username, default_tablespace, temporary_tablespace, account_status
+  FROM user_users;
 SELECT parameter, value
   FROM nls_database_parameters
- WHERE parameter IN ('NLS_CHARACTERSET', 'NLS_LENGTH_SEMANTICS');
+ WHERE parameter IN ('NLS_CHARACTERSET', 'NLS_NCHAR_CHARACTERSET', 'NLS_LENGTH_SEMANTICS');
 SELECT value FROM v$parameter WHERE name IN ('compatible', 'max_string_size');
 ```
 
-O acesso às views pode ser restrito no ambiente institucional. Nesse caso, solicitar os valores ao responsável pelo banco, sem tentar elevar privilégios.
+O resultado deve confirmar o schema `RM566462`, `AL32UTF8`, `AL16UTF16` e `MAX_STRING_SIZE=STANDARD`. O acesso a `V$VERSION` ou `V$PARAMETER` pode ser restrito no ambiente institucional. Nesse caso, usar os valores já fornecidos pela FIAP ou solicitar confirmação ao responsável, sem tentar elevar privilégios.
 
-### 2. Procurar tabelas e índices planejados
+### 2. Confirmar privilégios efetivos
+
+```sql
+SELECT privilege
+  FROM session_privs
+ WHERE privilege IN (
+    'CREATE TABLE', 'CREATE SEQUENCE', 'CREATE VIEW',
+    'CREATE TRIGGER', 'CREATE PROCEDURE', 'UNLIMITED TABLESPACE'
+ )
+ ORDER BY privilege;
+
+SELECT privilege, admin_option
+  FROM user_sys_privs
+ ORDER BY privilege;
+```
+
+Os cinco privilégios informados devem aparecer para confirmar o inventário institucional. Para este DDL específico, o bloqueio relevante é a ausência de `CREATE TABLE` ou de espaço utilizável; procedures, triggers e views não são criadas nesta fase. `UNLIMITED TABLESPACE` é opcional se houver quota suficiente no tablespace padrão.
+
+### 3. Confirmar quota e espaço visível
+
+```sql
+SELECT tablespace_name,
+       bytes AS used_bytes,
+       max_bytes,
+       CASE
+           WHEN max_bytes = -1 THEN NULL
+           ELSE max_bytes - bytes
+       END AS quota_remaining_bytes
+  FROM user_ts_quotas
+ ORDER BY tablespace_name;
+
+SELECT tablespace_name,
+       SUM(bytes) AS free_bytes,
+       MAX(bytes) AS largest_free_extent_bytes
+  FROM user_free_space
+ GROUP BY tablespace_name
+ ORDER BY tablespace_name;
+
+SELECT tablespace_name, status, contents, extent_management,
+       allocation_type, segment_space_management
+  FROM user_tablespaces
+ ORDER BY tablespace_name;
+```
+
+A implantação pode prosseguir com quota finita suficiente no tablespace padrão ou com `UNLIMITED TABLESPACE`. A combinação de linha ausente em `USER_TS_QUOTAS` e ausência de `UNLIMITED TABLESPACE`, quota restante insuficiente ou tablespace indisponível deve ser tratada com o responsável institucional. `USER_FREE_SPACE` mostra apenas extents visíveis e não informa de forma completa o limite de autoextend dos datafiles; sem acesso às views `DBA_*`, essa capacidade final precisa ser confirmada pelo administrador.
+
+### 4. Procurar tabelas e outros objetos canônicos
 
 ```sql
 SELECT object_type, object_name, status
@@ -119,41 +200,68 @@ SELECT object_type, object_name, status
     'TB_PRESCRIPTIONS', 'TB_PRESCRIPTION_ITEMS', 'TB_EXAMS',
     'TB_VACCINATIONS', 'TB_NOTIFICATIONS', 'TB_CONVERSATIONS', 'TB_MESSAGES'
  )
-    OR object_name LIKE 'IX_CV\_%' ESCAPE '\'
  ORDER BY object_type, object_name;
 ```
 
-### 3. Procurar constraints planejadas
+O resultado esperado para os 14 nomes é vazio. A consulta deve ser repetida imediatamente antes da execução, mesmo que o inventário anterior já tenha confirmado a ausência dessas tabelas.
+
+### 5. Procurar constraints planejadas
 
 ```sql
 SELECT constraint_name, constraint_type, table_name, status
   FROM user_constraints
- WHERE constraint_name LIKE 'PK_CV\_%' ESCAPE '\'
-    OR constraint_name LIKE 'UK_CV\_%' ESCAPE '\'
-    OR constraint_name LIKE 'CK_CV\_%' ESCAPE '\'
-    OR constraint_name LIKE 'FK_CV\_%' ESCAPE '\'
+ WHERE constraint_name LIKE 'PK\_CV\_%' ESCAPE '\'
+    OR constraint_name LIKE 'UK\_CV\_%' ESCAPE '\'
+    OR constraint_name LIKE 'CK\_CV\_%' ESCAPE '\'
+    OR constraint_name LIKE 'FK\_CV\_%' ESCAPE '\'
  ORDER BY constraint_name;
 ```
 
-Se qualquer linha for retornada nas verificações de objetos canônicos ou nomes `CV`, interromper. Não executar o DDL, não renomear e não remover o objeto sem identificar proprietário, estrutura, dados e origem.
+### 6. Procurar índices planejados e nomes reservados para PK/UNIQUE
+
+```sql
+SELECT index_name, table_name, uniqueness, status, tablespace_name
+  FROM user_indexes
+ WHERE index_name LIKE 'IX\_CV\_%' ESCAPE '\'
+    OR index_name LIKE 'PK\_CV\_%' ESCAPE '\'
+    OR index_name LIKE 'UK\_CV\_%' ESCAPE '\'
+ ORDER BY index_name;
+```
+
+As PKs e constraints `UNIQUE` normalmente criam índices. Por isso, nomes `PK_CV_*` e `UK_CV_*` também são verificados em `USER_INDEXES`, além dos 17 índices explícitos `IX_CV_*`.
+
+Se qualquer linha for retornada nas verificações de objetos canônicos ou nomes `CV`, interromper. Não executar o DDL, não renomear e não remover o objeto sem identificar estrutura, dados e origem.
 
 As tabelas acadêmicas `TB_TUTOR`, `TB_VETERINARIO`, `TB_ANIMAL`, `TB_VACINACAO`, `TB_FATO_ATENDIMENTO` e `TB_AUDITORIA_VACINACAO` não conflitam nominalmente com as tabelas canônicas. Os nomes de constraints acadêmicos também não conflitam com o prefixo `CV`.
 
 ## Execução manual após aprovação
 
-1. Exportar ou registrar o inventário atual do schema institucional.
-2. Revisar os resultados das consultas de pré-verificação com o responsável pelo banco.
-3. Executar em uma janela controlada, com uma conta proprietária dedicada e sem a API conectada.
-4. No SQLcl ou SQL*Plus, executar:
+1. Salvar os resultados das consultas de conta, privilégios, quota, objetos, constraints e índices.
+2. Prosseguir somente se as consultas de conflito estiverem vazias e houver quota ou `UNLIMITED TABLESPACE`.
+3. Executar em uma janela controlada, autenticado como `RM566462`, sem registrar senha em arquivo ou histórico compartilhado.
+4. Abrir o cliente sem informar senha na linha de comando. Usar um dos launchers:
 
-```text
-sql usuario@servico
+```bash
+# SQLcl
+sql RM566462@servico
+
+# SQL*Plus
+sqlplus RM566462@servico
+```
+
+5. Já no prompt SQLcl ou SQL*Plus, iniciar o spool e executar em modo script:
+
+```sql
+WHENEVER OSERROR EXIT FAILURE
+WHENEVER SQLERROR EXIT SQL.SQLCODE
+SPOOL clyvo-oracle-first-deploy.log
 @Java/api/database/script_bd_oracle.sql
+SPOOL OFF
 ```
 
 Se o diretório corrente já for `Java/api/database`, usar `@script_bd_oracle.sql`.
 
-`WHENEVER SQLERROR EXIT SQL.SQLCODE` interrompe SQLcl/SQL*Plus no primeiro erro. Ferramentas que ignoram comandos SQL*Plus devem ser configuradas explicitamente para parar no primeiro erro. Não executar como uma seleção parcial de comandos sem registrar exatamente o que foi aplicado.
+O DDL configura `WHENEVER OSERROR EXIT FAILURE` e `WHENEVER SQLERROR EXIT SQL.SQLCODE`, além de `ECHO` e `FEEDBACK`, para interromper SQLcl/SQL*Plus no primeiro erro e manter comandos/resultados no log. Ferramentas que ignoram comandos SQL*Plus devem ser configuradas explicitamente para parar no primeiro erro. Não executar como uma seleção parcial de comandos sem registrar exatamente o que foi aplicado.
 
 Não executar `demo-data.sql`, `demo-data-postgres.sql` ou o seed acadêmico nesse schema. Eles não são seeds Oracle operacionais.
 
@@ -175,28 +283,97 @@ SELECT table_name
 
 O resultado esperado é 14 linhas.
 
+### Colunas, tipos e nulabilidade
+
+```sql
+SELECT table_name, column_id, column_name, data_type,
+       data_length, data_precision, data_scale,
+       char_length, char_used, nullable
+  FROM user_tab_columns
+ WHERE table_name IN (
+    'TUTOR', 'VETERINARIAN', 'ANIMAL', 'TB_DEVICE_PUSH_TOKENS',
+    'TB_VETERINARIAN_TUTOR_LINKS', 'TB_APPOINTMENTS', 'TB_MEDICAL_RECORDS',
+    'TB_PRESCRIPTIONS', 'TB_PRESCRIPTION_ITEMS', 'TB_EXAMS',
+    'TB_VACCINATIONS', 'TB_NOTIFICATIONS', 'TB_CONVERSATIONS', 'TB_MESSAGES'
+ )
+ ORDER BY table_name, column_id;
+```
+
+Comparar o inventário integral com `script_bd_oracle.sql`, incluindo nulabilidade, `NUMBER(19,0)`, `NUMBER(10,0)`, `NUMBER(1,0)`, `FLOAT(24)`, `DATE`, `TIMESTAMP(6)`, `VARCHAR2` e `CLOB`. Essa comparação é obrigatória se a implantação tiver sido completada manualmente após uma falha parcial.
+
 ### Constraints
 
 ```sql
 SELECT constraint_type, status, validated, COUNT(*) AS quantity
   FROM user_constraints
- WHERE constraint_name LIKE '%\_CV\_%' ESCAPE '\'
+ WHERE constraint_name LIKE 'PK\_CV\_%' ESCAPE '\'
+    OR constraint_name LIKE 'UK\_CV\_%' ESCAPE '\'
+    OR constraint_name LIKE 'CK\_CV\_%' ESCAPE '\'
+    OR constraint_name LIKE 'FK\_CV\_%' ESCAPE '\'
  GROUP BY constraint_type, status, validated
  ORDER BY constraint_type;
 ```
 
 Todos os objetos devem estar `ENABLED` e `VALIDATED`. Conferir individualmente qualquer contagem divergente.
 
+As contagens esperadas para constraints nomeadas são: `P = 14`, `U = 6`, `C = 10` e `R = 22`. Constraints `NOT NULL` geradas pelo Oracle possuem nomes de sistema e não entram no filtro `CV`.
+
+Validar também nomes, colunas e destinos das FKs:
+
+```sql
+SELECT c.table_name,
+       c.constraint_name,
+       c.constraint_type,
+       c.status,
+       c.validated,
+       cc.position,
+       cc.column_name,
+       r.table_name AS referenced_table,
+       r.constraint_name AS referenced_constraint
+  FROM user_constraints c
+  JOIN user_cons_columns cc
+    ON cc.constraint_name = c.constraint_name
+  LEFT JOIN user_constraints r
+    ON r.constraint_name = c.r_constraint_name
+ WHERE c.constraint_name LIKE 'PK\_CV\_%' ESCAPE '\'
+    OR c.constraint_name LIKE 'UK\_CV\_%' ESCAPE '\'
+    OR c.constraint_name LIKE 'CK\_CV\_%' ESCAPE '\'
+    OR c.constraint_name LIKE 'FK\_CV\_%' ESCAPE '\'
+ ORDER BY c.table_name, c.constraint_name, cc.position;
+
+SELECT table_name, constraint_name, search_condition_vc
+  FROM user_constraints
+ WHERE constraint_type = 'C'
+   AND constraint_name LIKE 'CK\_CV\_%' ESCAPE '\'
+ ORDER BY table_name, constraint_name;
+```
+
+Os resultados devem corresponder exatamente aos nomes, colunas, enumerações, checks booleanos e referências definidos no DDL.
+
 ### Índices
 
 ```sql
 SELECT index_name, table_name, uniqueness, status
   FROM user_indexes
- WHERE index_name LIKE 'IX_CV\_%' ESCAPE '\'
+ WHERE index_name LIKE 'IX\_CV\_%' ESCAPE '\'
  ORDER BY index_name;
 ```
 
 O resultado esperado é 17 índices explícitos com status `VALID`.
+
+Validar a ordem e direção das colunas indexadas:
+
+```sql
+SELECT i.index_name, i.table_name, i.uniqueness, i.status,
+       c.column_position, c.column_name, c.descend
+  FROM user_indexes i
+  JOIN user_ind_columns c
+    ON c.index_name = i.index_name
+ WHERE i.index_name LIKE 'IX\_CV\_%' ESCAPE '\'
+ ORDER BY i.index_name, c.column_position;
+```
+
+Comparar as 17 definições com a ordem de colunas e os `DESC` de `script_bd_oracle.sql`.
 
 ### Colunas identity
 
@@ -214,6 +391,24 @@ SELECT table_name, column_name, generation_type
 
 O resultado esperado é uma coluna `ID` com geração `BY DEFAULT` em cada uma das 14 tabelas.
 
+### Metadados dos textos
+
+```sql
+SELECT table_name, column_name, data_type, data_length,
+       char_length, char_used
+  FROM user_tab_columns
+ WHERE table_name IN (
+    'TUTOR', 'VETERINARIAN', 'ANIMAL', 'TB_DEVICE_PUSH_TOKENS',
+    'TB_VETERINARIAN_TUTOR_LINKS', 'TB_APPOINTMENTS', 'TB_MEDICAL_RECORDS',
+    'TB_PRESCRIPTIONS', 'TB_PRESCRIPTION_ITEMS', 'TB_EXAMS',
+    'TB_VACCINATIONS', 'TB_NOTIFICATIONS', 'TB_CONVERSATIONS', 'TB_MESSAGES'
+ )
+   AND data_type IN ('VARCHAR2', 'CLOB')
+ ORDER BY table_name, column_id;
+```
+
+Para `VARCHAR2`, `CHAR_USED = 'C'` deve confirmar semântica de caracteres. `ANIMAL.HISTORY` deve aparecer como `CLOB`.
+
 ## Execução parcialmente concluída
 
 Como Oracle confirma cada DDL implicitamente, um erro pode deixar tabelas e índices já criados. Nessa situação:
@@ -230,3 +425,5 @@ O script é intencionalmente não idempotente. Transformá-lo em blocos que igno
 ## Limites da validação desta fase
 
 Foram realizadas apenas inspeção de código e validações estáticas locais. Não houve conexão com Oracle, execução de DDL/DML, deploy ou alteração de PostgreSQL/H2. A sintaxe e os tipos foram preparados para Oracle 19c, mas a validação final depende de execução aprovada em um schema descartável ou institucional controlado e, depois, do profile Java Oracle.
+
+Considerando os parâmetros institucionais confirmados, o script está pronto para primeira execução manual controlada do DDL, desde que as pré-verificações imediatamente anteriores confirmem ausência de colisões e quota suficiente. Não há bloqueio conhecido de sintaxe ou tipo para criar as 14 tabelas. A ativação da API Java sobre Oracle continua bloqueada pelas pendências do profile e pelo mapeamento `Animal.history`; esse bloqueio não impede a criação manual do schema nesta fase.

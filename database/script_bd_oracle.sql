@@ -1,5 +1,7 @@
 -- CLYVO - proposta de schema Oracle Database 19c para as 14 entidades JPA.
 -- Fase 1: somente estrutura. Este arquivo nao foi executado em banco Oracle.
+-- Ambiente institucional confirmado: schema RM566462, AL32UTF8 e
+-- MAX_STRING_SIZE=STANDARD. Nenhuma credencial e armazenada neste arquivo.
 --
 -- IMPORTANTE:
 -- 1. Execute antes as pre-verificacoes de database/README-oracle.md.
@@ -8,6 +10,10 @@
 -- 4. O script nao remove, substitui ou altera objetos preexistentes.
 -- 5. O script nao cria dados, packages, procedures, functions ou triggers.
 
+SET ECHO ON
+SET FEEDBACK ON
+SET DEFINE OFF
+WHENEVER OSERROR EXIT FAILURE
 WHENEVER SQLERROR EXIT SQL.SQLCODE
 
 CREATE TABLE tutor (
