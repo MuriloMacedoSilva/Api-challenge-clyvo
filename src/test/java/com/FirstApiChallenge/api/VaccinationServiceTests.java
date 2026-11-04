@@ -9,6 +9,7 @@ import com.FirstApiChallenge.api.model.Tutor;
 import com.FirstApiChallenge.api.model.Veterinarian;
 import com.FirstApiChallenge.api.model.VeterinarianTutorLink;
 import com.FirstApiChallenge.api.repository.AnimalRepository;
+import com.FirstApiChallenge.api.repository.JpaVaccinationHistoryReader;
 import com.FirstApiChallenge.api.repository.NotificationRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VaccinationRepository;
@@ -19,7 +20,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -30,13 +33,23 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @Transactional
 class VaccinationServiceTests {
 
     @Autowired
     private VaccinationService vaccinationService;
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JpaVaccinationHistoryReader vaccinationHistoryReader;
 
     @Autowired
     private VaccinationRepository vaccinationRepository;
@@ -268,6 +281,47 @@ class VaccinationServiceTests {
         assertEquals("V10", history.get(0).vaccineName());
         assertEquals("Antirrábica", history.get(1).vaccineName());
         assertEquals("V8", history.get(2).vaccineName());
+    }
+
+    @Test
+    void h2UsesJpaReaderWithDeterministicTieBreak() {
+        var first = vaccinationService.create(
+                animal.getId(),
+                author.getCpf(),
+                request("Primeira", LocalDate.now(), null, null)
+        );
+        var second = vaccinationService.create(
+                animal.getId(),
+                author.getCpf(),
+                request("Segunda", LocalDate.now(), null, null)
+        );
+
+        var history = vaccinationService.getByAnimalForTutor(tutor.getCpf(), animal.getId());
+
+        assertNotNull(vaccinationHistoryReader);
+        assertEquals(second.id(), history.get(0).id());
+        assertEquals(first.id(), history.get(1).id());
+    }
+
+    @Test
+    void tutorHistoryEndpointPreservesPublicContract() throws Exception {
+        vaccinationService.create(
+                animal.getId(),
+                author.getCpf(),
+                request("V10", LocalDate.now(), null, null)
+        );
+
+        mockMvc.perform(get(
+                        "/v1/vaccinations/tutor/{tutorCpf}/animals/{animalId}",
+                        tutor.getCpf(),
+                        animal.getId()
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].animalId").value(animal.getId()))
+                .andExpect(jsonPath("$[0].veterinarianCpf").value(author.getCpf()))
+                .andExpect(jsonPath("$[0].vaccineName").value("V10"))
+                .andExpect(jsonPath("$[0].applicationDate").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$[0].doseDateStatus").doesNotExist());
     }
 
     @Test

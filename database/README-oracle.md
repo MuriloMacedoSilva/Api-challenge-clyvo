@@ -461,8 +461,23 @@ Como Oracle confirma cada DDL implicitamente, um erro pode deixar tabelas e índ
 
 O script é intencionalmente não idempotente. Transformá-lo em blocos que ignoram `ORA-00955` mascararia objetos incompatíveis e não tornaria a implantação segura.
 
+## Package de vacinação compilado e integração preparada
+
+Os arquivos abaixo preparam uma camada PL/SQL read-only separada do DDL das 14 tabelas:
+
+- `pkg_clyvo_vacinacao_spec.sql`: specification de `PKG_CLYVO_VACINACAO`;
+- `pkg_clyvo_vacinacao_body.sql`: body com duas functions e duas procedures;
+- `validate_pkg_clyvo_vacinacao.sql`: validação posterior somente leitura;
+- `README-oracle-pkg-vacinacao.md`: contratos, erros, cursores, instalação, integração Java e validação manual.
+
+O package consulta `TUTOR`, `ANIMAL`, `VETERINARIAN` e `TB_VACCINATIONS` para classificar datas previstas, contar atenções objetivas, listar o histórico de um Animal e montar a agenda de um Tutor. Ele não contém DML, transação explícita, SQL dinâmico, trigger ou autorização baseada em CPF/CRMV. Propriedade do Animal, vínculo `ACCEPTED` e identidade do ator continuam no Java.
+
+O usuário confirmou a execução manual da specification e do body no Oracle institucional. `USER_OBJECTS` retornou `PACKAGE` e `PACKAGE BODY` como `VALID`, e `USER_ERRORS` não retornou erros. Não repetir `script_bd_oracle.sql` para instalar o package.
+
+O backend agora seleciona `OracleVaccinationHistoryReader` somente no profile `oracle` para chamar `PR_HISTORICO_ANIMAL` por `SimpleJdbcCall`; PostgreSQL e H2 continuam com `JpaVaccinationHistoryReader`. Autorização permanece no `VaccinationService`, antes da chamada. A integração Java foi coberta localmente com mocks e H2, mas ainda não foi executada contra o package Oracle real.
+
 ## Limites da validação desta fase
 
 Na implementação local do profile foram realizadas inspeção de código, resolução do driver e testes H2 sem abrir conexão Oracle. Posteriormente, a inicialização manual autorizada confirmou a conexão e o `ddl-auto=validate`, sem DDL ou deploy. Uma execução CRUD parcial posterior confirmou ping, cadastro/login de Tutor e cadastro de Animal, mas a leitura dos Animals encontrou uma `LazyInitializationException` na fronteira Service/Controller.
 
-O problema foi corrigido localmente sem alterar mappings, DDL ou o profile Oracle: `TutorService` consulta Animals diretamente, materializa `AnimalResponseDTO` dentro de uma transação read-only e o controller não percorre entidades. A auditoria aplicou a mesma fronteira transacional à listagem de Tutores vinculados. Três testes HTTP com banco H2 isolado e `spring.jpa.open-in-view=false` passaram; a suíte completa possui 121 testes aprovados. Não houve nova conexão, DML ou limpeza Oracle durante essa correção, portanto a releitura institucional permanece pendente. As demais identities em DML, datas, paginação, locks, transações e relacionamentos reais continuam condicionadas ao roteiro autorizado de `README-oracle-crud-tests.md`.
+O problema foi corrigido localmente sem alterar mappings, DDL ou o profile Oracle: `TutorService` consulta Animals diretamente, materializa `AnimalResponseDTO` dentro de uma transação read-only e o controller não percorre entidades. A auditoria aplicou a mesma fronteira transacional à listagem de Tutores vinculados. Três testes HTTP com banco H2 isolado e `spring.jpa.open-in-view=false` passaram. A suíte posterior à integração local do histórico vacinal possui 137 testes aprovados. Não houve nova conexão, DML ou limpeza Oracle durante essa implementação, portanto a chamada Java ao package e a releitura institucional permanecem pendentes. As demais identities em DML, datas, paginação, locks, transações e relacionamentos reais continuam condicionadas ao roteiro autorizado de `README-oracle-crud-tests.md`.

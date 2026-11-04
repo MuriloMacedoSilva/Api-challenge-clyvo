@@ -10,6 +10,7 @@ import com.FirstApiChallenge.api.model.Vaccination;
 import com.FirstApiChallenge.api.model.Veterinarian;
 import com.FirstApiChallenge.api.repository.AnimalRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
+import com.FirstApiChallenge.api.repository.VaccinationHistoryReader;
 import com.FirstApiChallenge.api.repository.VaccinationRepository;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,7 @@ public class VaccinationService {
     private final AnimalRepository animalRepository;
     private final TutorRepository tutorRepository;
     private final VeterinarianRepository veterinarianRepository;
+    private final VaccinationHistoryReader vaccinationHistoryReader;
     private final ClinicalAccessValidator accessValidator;
     private final NotificationPublisher notificationPublisher;
 
@@ -34,12 +36,14 @@ public class VaccinationService {
             AnimalRepository animalRepository,
             TutorRepository tutorRepository,
             VeterinarianRepository veterinarianRepository,
+            VaccinationHistoryReader vaccinationHistoryReader,
             ClinicalAccessValidator accessValidator,
             NotificationPublisher notificationPublisher) {
         this.vaccinationRepository = vaccinationRepository;
         this.animalRepository = animalRepository;
         this.tutorRepository = tutorRepository;
         this.veterinarianRepository = veterinarianRepository;
+        this.vaccinationHistoryReader = vaccinationHistoryReader;
         this.accessValidator = accessValidator;
         this.notificationPublisher = notificationPublisher;
     }
@@ -103,7 +107,7 @@ public class VaccinationService {
 
         accessValidator.requireTutorOwnership(tutor, animal);
 
-        return mapVaccinations(vaccinationRepository.findByAnimalIdOrderByApplicationDateDesc(animalId));
+        return vaccinationHistoryReader.findByAnimalId(animalId);
     }
 
     @Transactional(readOnly = true)
@@ -114,11 +118,7 @@ public class VaccinationService {
         Animal animal = findAnimal(animalId);
         validateAcceptedLink(veterinarian, animal.getTutor());
 
-        return mapVaccinations(vaccinationRepository.findByAnimalIdOrderByApplicationDateDesc(animalId));
-    }
-
-    private List<VaccinationResponseDTO> mapVaccinations(List<Vaccination> vaccinations) {
-        return vaccinations.stream().map(VaccinationResponseDTO::fromEntity).toList();
+        return vaccinationHistoryReader.findByAnimalId(animalId);
     }
 
     private Vaccination findVaccination(Long vaccinationId) {
