@@ -2,9 +2,9 @@
 
 ## Propósito
 
-`script_bd_oracle.sql` é uma proposta de primeira implantação das 14 tabelas correspondentes às entidades JPA atuais. Ele prepara uma futura execução da mesma API Spring Boot sobre Oracle Database 19c sem substituir o PostgreSQL ou o H2.
+`script_bd_oracle.sql` define as 14 tabelas correspondentes às entidades JPA atuais. O profile Spring Boot `oracle` permite executar a mesma API sobre Oracle Database 19c sem substituir os profiles PostgreSQL ou H2.
 
-O arquivo não foi executado no Oracle institucional. Ele não contém dados, `DROP`, `TRUNCATE`, packages, procedures, functions ou triggers. O SQL acadêmico original em `../../../database/2TDSA_2024_CodigoSql_Integrantes.sql` permanece separado e inalterado.
+Segundo o inventário institucional fornecido ao projeto, o arquivo foi executado com sucesso no schema `RM566462` e criou os 14 objetos planejados. Esta atualização Java não abriu conexão com esse ambiente nem executou DDL ou DML. O arquivo não contém dados, `DROP`, `TRUNCATE`, packages, procedures, functions ou triggers. O SQL acadêmico original em `../../../database/2TDSA_2024_CodigoSql_Integrantes.sql` permanece separado e inalterado.
 
 ## Ambiente institucional confirmado
 
@@ -82,7 +82,7 @@ As colunas expostas a essa diferença são:
 | `TB_VACCINATIONS.OBSERVATIONS` | `VARCHAR2(4000 CHAR)` | 4000 caracteres |
 | `TB_MESSAGES.CONTENT` | `VARCHAR2(2000 CHAR)` | 2000 caracteres |
 
-Em cenário extremo com caracteres de 4 bytes, o teto físico pode ser atingido com aproximadamente 1000 caracteres. Trocar essas colunas para `CLOB` seria a única forma de garantir os limites lógicos completos para qualquer conteúdo Unicode, mas quebraria a equivalência de tipo esperada pelas entidades atuais e exigiria alteração Java com `@Lob`. Como esta fase proíbe alteração Java, o DDL mantém `VARCHAR2(... CHAR)` e registra o risco para decisão coordenada futura.
+Em cenário extremo com caracteres de 4 bytes, o teto físico pode ser atingido com aproximadamente 1000 caracteres. Trocar essas colunas para `CLOB` seria a única forma de garantir os limites lógicos completos para qualquer conteúdo Unicode, mas exigiria alteração coordenada das entidades e do DDL. O schema atual mantém `VARCHAR2(... CHAR)` e registra o risco para decisão futura.
 
 O uso de `FLOAT(24)` deve ser testado com valores limítrofes, arredondamento e o driver JDBC escolhido. PostgreSQL `real` e Java `Float` seguem IEEE-754, enquanto Oracle `FLOAT` usa a representação numérica do Oracle e não preserva valores especiais como `NaN` e infinito com a mesma semântica.
 
@@ -90,17 +90,52 @@ As colunas de vacinação usam `DATE` por ser o tipo Oracle compatível com `Loc
 
 Oracle trata string vazia (`''`) como `NULL`. A aplicação já normaliza muitos textos clínicos opcionais, mas campos obrigatórios devem continuar sendo validados antes da persistência. Um valor vazio em coluna `NOT NULL` falhará como `NULL`, diferentemente do PostgreSQL.
 
-## Pendências Java antes do profile Oracle
+## Profile Java Oracle
 
-Esta fase não modifica Java. Antes de usar `spring.jpa.hibernate.ddl-auto=validate` com Oracle, será necessário:
+O profile `oracle` está configurado em `src/main/resources/application-oracle.properties` com:
 
-1. Adicionar o driver JDBC Oracle compatível com Java 21 e Oracle 19c.
-2. Criar `application-oracle.properties` com URL, usuário e senha externos, sem fallback institucional ou credenciais versionadas.
-3. Manter `ddl-auto=validate` e deixar o Hibernate detectar o dialect Oracle, salvo necessidade comprovada de configuração explícita.
-4. Substituir `Animal.history` com `columnDefinition = "TEXT"` por um mapeamento portátil de `CLOB`, normalmente `@Lob`, porque `TEXT` não existe no Oracle.
-5. Validar com Hibernate os mapeamentos `boolean -> NUMBER(1)`, `Float -> FLOAT(24)`, identity e `LocalDate -> DATE` usando o driver escolhido.
-6. Testar as queries derivadas e JPQL no Oracle, especialmente paginação/limite, locks pessimistas e ordenações.
-7. Decidir se os campos atuais de 2000/4000 caracteres continuarão sujeitos ao teto de 4000 bytes ou migrarão para `CLOB` com alteração JPA correspondente.
+- `ojdbc11` `23.9.0.25.07` em runtime, versão gerenciada pelo Spring Boot e compatível com Java 21 e Oracle 19c;
+- `OracleDialect` explícito e `spring.jpa.hibernate.ddl-auto=validate`;
+- `spring.sql.init.mode=never`, sem seed, criação automática ou migration;
+- credenciais exclusivamente pelas variáveis obrigatórias `ORACLE_DB_URL`, `ORACLE_DB_USERNAME` e `ORACLE_DB_PASSWORD`;
+- pool pequeno por padrão, timeouts de conexão/leitura e falha rápida configuráveis pelas variáveis `ORACLE_*` documentadas em `.env.example`;
+- SQL, formatação SQL e console H2 desabilitados.
+
+`Animal.history` usa `@JdbcTypeCode(SqlTypes.LONG32VARCHAR)`. No Hibernate 7.2 esse tipo materializado gera `text` no PostgreSQL e `CLOB` no Oracle/H2, mantendo a propriedade Java como `String`. `@Lob` não foi usado porque o dialect PostgreSQL o associaria a `oid`, incompatível com a coluna `text` existente.
+
+Os demais mapeamentos foram preservados. O `OracleDialect` representa `boolean` como `NUMBER(1,0)`, `Long` como `NUMBER(19,0)` e `Float` como `FLOAT(24)`, em alinhamento com o DDL. A validação de startup confirmou a compatibilidade estrutural; identities em DML, `LocalDate`, paginação, locks e transações ainda dependem de execução controlada no Oracle real.
+
+O profile já foi inicializado com sucesso no Oracle institucional: conexão JDBC, schema `RM566462`, Hibernate 7.2.12, validação de schema e criação do `EntityManagerFactory` concluíram sem erro. Isso valida a compatibilidade estrutural de startup, mas não substitui CRUD, transações e relacionamentos reais. O roteiro controlado está em `database/README-oracle-crud-tests.md`.
+
+Os campos de 2000/4000 caracteres continuam sujeitos ao teto Oracle de 4000 bytes descrito acima. Migrá-los para `CLOB` exige alteração coordenada do DDL e do mapeamento, não uma mudança isolada no profile.
+
+### Inicialização manual da API
+
+Definir as variáveis somente na sessão local autorizada. A senha pode ser lida sem aparecer no histórico do shell:
+
+```bash
+export SPRING_PROFILES_ACTIVE=oracle
+export ORACLE_DB_URL='jdbc:oracle:thin:@//host:1521/service-name'
+export ORACLE_DB_USERNAME='usuario-do-schema'
+read -rs ORACLE_DB_PASSWORD && export ORACLE_DB_PASSWORD
+./mvnw spring-boot:run
+```
+
+No Docker, o entrypoint não executa `psql` quando o profile ativo inclui `oracle`; a conectividade e o schema são validados pelo driver, Hikari e Hibernate. O `docker-compose.yml` continua dedicado ao PostgreSQL local e não recebe credenciais Oracle.
+
+### Protocolo de teste controlado
+
+Executar somente após autorização para conectar e alterar dados no schema:
+
+1. Confirmar que a API inicia sem erro de `Schema-validation`; qualquer divergência deve interromper o ensaio, sem `ALTER`, `CREATE` ou `DROP` automático.
+2. Confirmar `GET /tutor/ping` e a geração do OpenAPI sem inserir dados.
+3. Em massa descartável aprovada, cadastrar Tutor, Veterinário e Animal sem informar IDs e confirmar IDs gerados pelas identities.
+4. Exercitar um CRUD representativo e reler os valores, incluindo `Animal.history`, booleanos, `LocalDate`, `LocalDateTime`, enums e textos Unicode.
+5. Exercitar consultas com `PageRequest`/limites, ordenações e o lock pessimista das transições de Exam.
+6. Provocar uma falha de validação dentro de um caso de uso transacional e confirmar que nenhuma alteração parcial ou Notification ficou persistida.
+7. Remover somente a massa descartável criada pelo ensaio, pelos endpoints autorizados; não limpar nem alterar registros preexistentes.
+
+Os testes automatizados locais verificam o carregamento das propriedades sem conexão Oracle, a presença do driver e a persistência H2 de `Animal.history` com 40.000 caracteres. Eles não substituem este protocolo no Oracle 19c.
 
 O DDL não adiciona unicidade para CPF, e-mail, CRMV ou CNPJ porque as entidades e o DDL PostgreSQL atuais não a declaram. Alterar essa integridade exige decisão funcional, inspeção de dados e mudança coordenada, não uma divergência silenciosa apenas no Oracle.
 
@@ -126,6 +161,8 @@ Functions, procedures e trigger do trabalho acadêmico referenciam as tabelas ac
 ## Pré-verificação obrigatória
 
 Oracle executa DDL com commits implícitos. Portanto, a verificação deve ocorrer antes da execução, na mesma conta que será proprietária dos objetos.
+
+Esta seção se aplica a uma implantação nova ou recuperação formalmente aprovada. Como as 14 tabelas já foram informadas como criadas no schema institucional, não se deve repetir o DDL nesse schema; usar as consultas de validação pós-execução para inventariar o estado atual.
 
 Todas as consultas desta seção são somente leitura.
 
@@ -235,6 +272,8 @@ Se qualquer linha for retornada nas verificações de objetos canônicos ou nome
 As tabelas acadêmicas `TB_TUTOR`, `TB_VETERINARIO`, `TB_ANIMAL`, `TB_VACINACAO`, `TB_FATO_ATENDIMENTO` e `TB_AUDITORIA_VACINACAO` não conflitam nominalmente com as tabelas canônicas. Os nomes de constraints acadêmicos também não conflitam com o prefixo `CV`.
 
 ## Execução manual após aprovação
+
+Não repetir este procedimento no schema institucional que já contém as 14 tabelas. Ele permanece documentado para ambientes novos e para rastreabilidade da implantação original.
 
 1. Salvar os resultados das consultas de conta, privilégios, quota, objetos, constraints e índices.
 2. Prosseguir somente se as consultas de conflito estiverem vazias e houver quota ou `UNLIMITED TABLESPACE`.
@@ -424,6 +463,6 @@ O script é intencionalmente não idempotente. Transformá-lo em blocos que igno
 
 ## Limites da validação desta fase
 
-Foram realizadas apenas inspeção de código e validações estáticas locais. Não houve conexão com Oracle, execução de DDL/DML, deploy ou alteração de PostgreSQL/H2. A sintaxe e os tipos foram preparados para Oracle 19c, mas a validação final depende de execução aprovada em um schema descartável ou institucional controlado e, depois, do profile Java Oracle.
+Na implementação local do profile foram realizadas inspeção de código, resolução do driver e testes H2 sem abrir conexão Oracle. Posteriormente, a inicialização manual autorizada confirmou a conexão e o `ddl-auto=validate`, sem DDL ou deploy. Uma execução CRUD parcial posterior confirmou ping, cadastro/login de Tutor e cadastro de Animal, mas a leitura dos Animals encontrou uma `LazyInitializationException` na fronteira Service/Controller.
 
-Considerando os parâmetros institucionais confirmados, o script está pronto para primeira execução manual controlada do DDL, desde que as pré-verificações imediatamente anteriores confirmem ausência de colisões e quota suficiente. Não há bloqueio conhecido de sintaxe ou tipo para criar as 14 tabelas. A ativação da API Java sobre Oracle continua bloqueada pelas pendências do profile e pelo mapeamento `Animal.history`; esse bloqueio não impede a criação manual do schema nesta fase.
+O problema foi corrigido localmente sem alterar mappings, DDL ou o profile Oracle: `TutorService` consulta Animals diretamente, materializa `AnimalResponseDTO` dentro de uma transação read-only e o controller não percorre entidades. A auditoria aplicou a mesma fronteira transacional à listagem de Tutores vinculados. Três testes HTTP com banco H2 isolado e `spring.jpa.open-in-view=false` passaram; a suíte completa possui 121 testes aprovados. Não houve nova conexão, DML ou limpeza Oracle durante essa correção, portanto a releitura institucional permanece pendente. As demais identities em DML, datas, paginação, locks, transações e relacionamentos reais continuam condicionadas ao roteiro autorizado de `README-oracle-crud-tests.md`.

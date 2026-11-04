@@ -15,6 +15,8 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     Optional<Animal> findByIdAndTutorCpf(Long id, String cpf);
 
+    List<Animal> findAllByTutorCpf(String tutorCpf);
+
     boolean existsByTutorIdAndNameIgnoreCase(Long tutorId, String name);
 
     long countByTutorCpf(String tutorCpf);

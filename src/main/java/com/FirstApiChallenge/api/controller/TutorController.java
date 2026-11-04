@@ -10,10 +10,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.FirstApiChallenge.api.model.Animal;
 
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/tutor")
@@ -73,11 +71,7 @@ public class TutorController {
     @GetMapping("/{cpf}/read-animals")
     public ResponseEntity<Set<AnimalResponseDTO>> readAllAnimalsByCpf(@PathVariable String cpf) {
 
-        Set<AnimalResponseDTO> response = tutorService
-                .readAnimalsByTutor(cpf)
-                .stream()
-                .map(AnimalResponseDTO::fromEntity)
-                .collect(Collectors.toSet());
+        Set<AnimalResponseDTO> response = tutorService.readAnimalsByTutor(cpf);
 
         return ResponseEntity.ok(response);
     }
@@ -129,4 +123,3 @@ public class TutorController {
     }
 
 }
-

@@ -1,5 +1,6 @@
--- CLYVO - proposta de schema Oracle Database 19c para as 14 entidades JPA.
--- Fase 1: somente estrutura. Este arquivo nao foi executado em banco Oracle.
+-- CLYVO - schema Oracle Database 19c para as 14 entidades JPA.
+-- Somente estrutura, sem dados. Segundo o inventario institucional, este DDL ja
+-- foi executado no schema RM566462 e nao deve ser repetido nesse schema.
 -- Ambiente institucional confirmado: schema RM566462, AL32UTF8 e
 -- MAX_STRING_SIZE=STANDARD. Nenhuma credencial e armazenada neste arquivo.
 --

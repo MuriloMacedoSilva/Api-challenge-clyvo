@@ -943,7 +943,7 @@ O profile `test` é ativado por `src/test/resources/application.properties` e us
 ./mvnw test
 ```
 
-O código-fonte atual contém 115 testes distribuídos entre:
+O código-fonte atual contém 121 testes distribuídos entre:
 
 | Área | Quantidade |
 |---|---:|
@@ -957,11 +957,13 @@ O código-fonte atual contém 115 testes distribuídos entre:
 | Prontuários | 3 |
 | Prescrições | 3 |
 | Exames | 3 |
-| Contexto da aplicação | 1 |
+| Contexto da aplicação e histórico extenso | 2 |
+| Configuração do profile Oracle | 2 |
 | Reexecução do seed H2 | 1 |
 | Push notifications e tokens | 16 |
+| Leitura transacional de Animals com OSIV desabilitado | 3 |
 
-A maior parte da suíte testa services com contexto Spring. Dashboard e registro de push também possuem cobertura HTTP com MockMvc. Não há testes dedicados para autenticação, Tutor, Veterinário, vínculos e para a maioria dos controllers.
+A maior parte da suíte testa services com contexto Spring. Dashboard, registro de push e leitura de Animals também possuem cobertura HTTP com MockMvc. Os testes de Animals usam H2 isolado com OSIV desabilitado e cobrem o endpoint do Tutor e a listagem análoga de Tutores vinculados. Não há testes dedicados para autenticação, cadastro de Tutor/Veterinário e para a maioria dos controllers.
 
 ## Limitações Conhecidas
 

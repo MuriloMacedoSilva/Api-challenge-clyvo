@@ -188,6 +188,7 @@ public class LinkService {
                 .collect(Collectors.toSet());
     }
 
+    @Transactional(readOnly = true)
     public List<TutorResponseDTO> getLinkedTutorsForVet(String veterinarianCpf) {
         List<VeterinarianTutorLink> links = linkRepository.findByVeterinarianCpfAndStatus(veterinarianCpf, LinkStatus.ACCEPTED);
 

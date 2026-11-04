@@ -44,6 +44,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(
@@ -83,7 +85,7 @@ public class Animal {
     @Column(nullable = false)
     private String species;
 
-    @Column(columnDefinition = "TEXT")
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
     private String history;
 
     @ManyToOne(fetch = FetchType.LAZY)

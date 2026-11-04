@@ -1,6 +1,7 @@
 package com.FirstApiChallenge.api.service;
 
 import com.FirstApiChallenge.api.dto.AnimalDTO;
+import com.FirstApiChallenge.api.dto.AnimalResponseDTO;
 import com.FirstApiChallenge.api.dto.TutorRequestDTO;
 import com.FirstApiChallenge.api.dto.TutorResponseDTO;
 import com.FirstApiChallenge.api.exception.CustomException;
@@ -179,9 +180,9 @@ public class TutorService {
 //    }
 
     @Transactional(readOnly = true)
-    public Set<Animal> readAnimalsByTutor(String cpf) {
+    public Set<AnimalResponseDTO> readAnimalsByTutor(String cpf) {
 
-        Tutor tutor = tutorRepository.findByCpf(cpf)
+        tutorRepository.findByCpf(cpf)
                 .orElseThrow(() ->
                         new CustomException(
                                 "Tutor não encontrado",
@@ -189,7 +190,10 @@ public class TutorService {
                         )
                 );
 
-        return tutor.getAnimals();
+        return animalRepository.findAllByTutorCpf(cpf)
+                .stream()
+                .map(AnimalResponseDTO::fromEntity)
+                .collect(Collectors.toSet());
     }
 
 //    @Transactional
