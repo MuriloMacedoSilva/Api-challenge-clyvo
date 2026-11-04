@@ -4,7 +4,7 @@
 
 Os scripts desta pasta definem o package read-only `PKG_CLYVO_VACINACAO` para Oracle Database 19c. O usuario confirmou a execucao manual da specification e do body no Oracle institucional: `USER_OBJECTS` retornou `PACKAGE` e `PACKAGE BODY` com status `VALID`, e `USER_ERRORS` nao retornou erros.
 
-O backend Java possui integracao preparada para `PR_HISTORICO_ANIMAL`, mas a chamada Java -> `SimpleJdbcCall` -> package ainda nao foi executada no Oracle institucional. Os testes locais usam H2 e mocks e nao substituem essa validacao real.
+O backend Java integra `PR_HISTORICO_ANIMAL` por `SimpleJdbcCall`. O usuario confirmou posteriormente um teste manual bem-sucedido do historico vacinal com o profile `oracle`; os testes locais com H2/mocks continuam sem substituir validacoes mais amplas de concorrencia, volume e falhas reais do driver.
 
 Arquivos:
 
@@ -258,7 +258,7 @@ O reader JPA usa `APPLICATION_DATE DESC, ID DESC`, igual ao package. Historico v
 
 ## Validacao manual da chamada Java
 
-Esta etapa somente deve ser executada pelo usuario em ambiente autorizado. Ela nao foi realizada durante a implementacao.
+Esta etapa somente deve ser repetida pelo usuario em ambiente autorizado. O usuario informou que a chamada foi validada manualmente com sucesso depois da implementacao.
 
 1. Confirme novamente `PACKAGE` e `PACKAGE BODY` como `VALID` e `USER_ERRORS` vazio.
 2. Identifique por consultas read-only um `animalId` e o CPF de seu Tutor, sem criar massa nova.
@@ -281,7 +281,7 @@ Para reverter a integracao, publique o JAR anterior ou reverta `VaccinationHisto
 
 ## Limitacoes
 
-- A compilacao PL/SQL foi confirmada pelo usuario no Oracle 19c; a chamada via JDBC ainda nao foi confirmada.
+- A compilacao PL/SQL e uma chamada manual via JDBC/profile `oracle` foram confirmadas pelo usuario.
 - H2 e mocks nao validam o registro real de `Types.REF_CURSOR`, o fechamento do cursor pelo driver ou a participacao da conexao Oracle na transacao Spring.
 - `PR_HISTORICO_ANIMAL` usa `TRUNC(SYSDATE)` apenas para a coluna derivada `DOSE_DATE_STATUS`; os 15 campos do DTO nao dependem dessa classificacao.
 - `PR_AGENDA_DOSES_TUTOR` usa a data fornecida pelo chamador e nao persiste status.

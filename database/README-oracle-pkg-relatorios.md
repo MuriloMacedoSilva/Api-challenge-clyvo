@@ -4,7 +4,7 @@
 
 Os scripts desta pasta definem `PKG_CLYVO_RELATORIOS` para Oracle Database 19c. O usuario confirmou a execucao manual da specification, do body e do validador no Oracle institucional: `PACKAGE` e `PACKAGE BODY` ficaram `VALID`, sem linhas em `USER_ERRORS`, e as verificacoes somente leitura foram concluidas com sucesso.
 
-O backend Java usa `DashboardMetricsReader`: `JpaDashboardMetricsReader` permanece ativo em `local`, `prod`, `render` e `test`, enquanto `OracleDashboardMetricsReader` chama somente `PR_INDICADORES_TUTOR` e `PR_INDICADORES_VETERINARIO` no profile `oracle`. As procedures de consultas por periodo continuam sem consumidor Java. A chamada Java real ao package Oracle ainda nao foi executada.
+O backend Java usa `DashboardMetricsReader`: `JpaDashboardMetricsReader` permanece ativo em `local`, `prod`, `render` e `test`, enquanto `OracleDashboardMetricsReader` chama somente `PR_INDICADORES_TUTOR` e `PR_INDICADORES_VETERINARIO` no profile `oracle`. O usuario confirmou posteriormente testes manuais bem-sucedidos dos dashboards no profile `oracle`. As procedures de consultas por periodo continuam sem consumidor Java.
 
 Arquivos:
 
@@ -350,7 +350,7 @@ Proxima consulta, atividades recentes, serie mensal e distribuicao por especie c
 
 ## Limitacoes e riscos
 
-- A compilacao e o validador PL/SQL foram confirmados pelo usuario no Oracle institucional, mas a chamada Java via `SimpleJdbcCall` ainda nao foi confirmada.
+- A compilacao, o validador PL/SQL e chamadas manuais via `SimpleJdbcCall`/profile `oracle` foram confirmados pelo usuario.
 - H2 e mocks nao validam tipos JDBC reais, privilegios de execucao ou participacao da conexao Oracle na transacao Spring.
 - `TIMESTAMP(6)` e `LocalDateTime` nao carregam timezone.
 - CPF nao possui unique constraint no schema, embora seja retornado para apresentacao.

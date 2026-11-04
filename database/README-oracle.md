@@ -474,7 +474,7 @@ O package consulta `TUTOR`, `ANIMAL`, `VETERINARIAN` e `TB_VACCINATIONS` para cl
 
 O usuário confirmou a execução manual da specification e do body no Oracle institucional. `USER_OBJECTS` retornou `PACKAGE` e `PACKAGE BODY` como `VALID`, e `USER_ERRORS` não retornou erros. Não repetir `script_bd_oracle.sql` para instalar o package.
 
-O backend agora seleciona `OracleVaccinationHistoryReader` somente no profile `oracle` para chamar `PR_HISTORICO_ANIMAL` por `SimpleJdbcCall`; PostgreSQL e H2 continuam com `JpaVaccinationHistoryReader`. Autorização permanece no `VaccinationService`, antes da chamada. A integração Java foi coberta localmente com mocks e H2, mas ainda não foi executada contra o package Oracle real.
+O backend agora seleciona `OracleVaccinationHistoryReader` somente no profile `oracle` para chamar `PR_HISTORICO_ANIMAL` por `SimpleJdbcCall`; PostgreSQL e H2 continuam com `JpaVaccinationHistoryReader`. Autorização permanece no `VaccinationService`, antes da chamada. A integração Java foi coberta localmente com mocks/H2 e o usuário confirmou posteriormente um teste manual bem-sucedido do histórico no profile `oracle`.
 
 ## Package de relatórios e integração dos indicadores
 
@@ -484,7 +484,17 @@ O body reutiliza `PKG_CLYVO_VACINACAO.FN_QTD_ATENCOES_TUTOR`, evitando duplicar 
 
 O usuário confirmou a execução manual da specification, do body e do validador no Oracle institucional, com `PACKAGE` e `PACKAGE BODY` como `VALID` e sem `USER_ERRORS`. O backend agora seleciona `OracleDashboardMetricsReader` somente no profile `oracle` para chamar `PR_INDICADORES_TUTOR` e `PR_INDICADORES_VETERINARIO` por `SimpleJdbcCall`; os demais profiles continuam com `JpaDashboardMetricsReader`. Os Services preservam a resolução do ator por CPF, a transação read-only, o mesmo instante de `generatedAt` e a composição JPA das demais seções. As procedures de consultas por período não foram integradas.
 
-A integração Java foi coberta localmente com H2 e mocks, incluindo seleção por profile, parâmetros ID/TIMESTAMP, OUT numéricos, falhas incompletas e erros `-20021` a `-20025`. A chamada Java real ao package Oracle continua pendente e nenhuma conexão institucional foi aberta durante esta implementação.
+A integração Java foi coberta localmente com H2 e mocks, incluindo seleção por profile, parâmetros ID/TIMESTAMP, OUT numéricos, falhas incompletas e erros `-20021` a `-20025`. O usuário confirmou posteriormente testes manuais bem-sucedidos dos dashboards no profile `oracle`; nenhuma conexão institucional foi aberta durante a implementação local.
+
+## Auditoria vacinal preparada localmente
+
+`create_clyvo_vaccination_audit.sql`, `pkg_clyvo_auditoria_spec.sql`, `pkg_clyvo_auditoria_body.sql` e `trg_cv_aud_vaccination.sql` preparam uma extensão Oracle independente para auditar INSERT, UPDATE e DELETE em `TB_VACCINATIONS`. A trigger row-level delega ao package, que persiste snapshots OLD/NEW tipados na tabela `TB_CLYVO_VACCINATION_AUDIT` dentro da mesma transação. Não há `COMMIT`, `ROLLBACK`, autonomous transaction, SQL dinâmico ou supressão de erros.
+
+Observações clínicas não são copiadas; somente um indicador registra se elas mudaram. `SESSION_USER` identifica apenas a conta técnica do banco e `CLIENT_IDENTIFIER` permanece opcional porque o Java atual não o configura de forma confiável. A tabela não possui FKs, preservando snapshots após exclusões físicas de Vaccination e futuras remoções de referências.
+
+`validate_clyvo_vaccination_audit.sql` prepara validação somente leitura de objetos, erros, colunas, identity, constraints, índice, trigger, dependências e escopo. `test_clyvo_vaccination_audit_transactional.sql` é separado, explicitamente mutável, usa marcador `CV_AUD_TEST_*` e termina em rollback. `README-oracle-vaccination-audit.md` documenta pre-verificação, instalação, política fail-closed, teste concorrente de falha, retenção, riscos e evidências.
+
+Nenhum script da auditoria foi executado nem compilado no Oracle institucional nesta fase. Nenhuma conexão, DDL ou DML foi realizada, e os endpoints Java não foram alterados.
 
 ## Limites da validação desta fase
 
