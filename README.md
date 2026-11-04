@@ -141,7 +141,7 @@ O `Dockerfile.postgres` deriva de `postgres:16`. O schema é copiado para `/dock
 
 - `local`: `ddl-auto=update`, preservado para compatibilidade com bancos locais existentes.
 - `prod`: `ddl-auto=validate`; o schema deve existir antes da API iniciar.
-- `oracle`: `ddl-auto=validate` sobre Oracle 19c; o histórico vacinal usa `PKG_CLYVO_VACINACAO.PR_HISTORICO_ANIMAL` depois das validações de acesso no Java.
+- `oracle`: `ddl-auto=validate` sobre Oracle 19c; o histórico vacinal usa `PKG_CLYVO_VACINACAO.PR_HISTORICO_ANIMAL` e os contadores dos dashboards usam as procedures de indicadores de `PKG_CLYVO_RELATORIOS`, sempre depois da resolução do ator no Java.
 - `render`: `ddl-auto=create` sobre H2 em memória; cria um schema novo e a massa demo a cada inicialização.
 - `test`: `ddl-auto=create-drop` sobre H2 em memória.
 
@@ -879,7 +879,7 @@ Exceções ao envelope JSON:
 |---|---|---|
 | `local` | PostgreSQL | Profile default, `ddl-auto=update` e SQL visível |
 | `prod` | PostgreSQL | Datasource obrigatório por variáveis e `ddl-auto=validate` |
-| `oracle` | Oracle 19c | `ddl-auto=validate`; histórico vacinal via package e demais operações via JPA |
+| `oracle` | Oracle 19c | `ddl-auto=validate`; histórico vacinal e contadores dos dashboards via packages, demais operações via JPA |
 | `render` | H2 em memória | `ddl-auto=create` e seed automático de demonstração |
 | `test` | H2 em memória | `ddl-auto=create-drop`, ativado automaticamente nos testes |
 
@@ -945,7 +945,7 @@ O profile `test` é ativado por `src/test/resources/application.properties` e us
 ./mvnw test
 ```
 
-O código-fonte atual contém 137 testes distribuídos entre:
+O código-fonte atual contém 153 testes distribuídos entre:
 
 | Área | Quantidade |
 |---|---:|
@@ -953,7 +953,7 @@ O código-fonte atual contém 137 testes distribuídos entre:
 | Client HTTP CLYVO AI | 8 |
 | Chat | 15 |
 | Vacinação e contrato REST | 17 |
-| Reader Oracle e seleção por profile | 14 |
+| Readers Oracle e seleção por profile | 30 |
 | Dashboard do Veterinário | 13 |
 | Dashboard do Tutor | 19 |
 | Consultas | 3 |

@@ -5,14 +5,12 @@ import com.FirstApiChallenge.api.dto.DashboardSpeciesMetricDTO;
 import com.FirstApiChallenge.api.dto.DashboardUpcomingAppointmentDTO;
 import com.FirstApiChallenge.api.dto.VeterinarianDashboardResponseDTO;
 import com.FirstApiChallenge.api.enums.AppointmentStatus;
-import com.FirstApiChallenge.api.enums.ExamStatus;
 import com.FirstApiChallenge.api.enums.LinkStatus;
 import com.FirstApiChallenge.api.exception.CustomException;
 import com.FirstApiChallenge.api.repository.AnimalRepository;
 import com.FirstApiChallenge.api.repository.AppointmentRepository;
-import com.FirstApiChallenge.api.repository.ExamRepository;
+import com.FirstApiChallenge.api.repository.DashboardMetricsReader;
 import com.FirstApiChallenge.api.repository.VeterinarianRepository;
-import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,61 +36,38 @@ public class VeterinarianDashboardService {
     };
 
     private final VeterinarianRepository veterinarianRepository;
-    private final VeterinarianTutorLinkRepository linkRepository;
+    private final DashboardMetricsReader dashboardMetricsReader;
     private final AnimalRepository animalRepository;
     private final AppointmentRepository appointmentRepository;
-    private final ExamRepository examRepository;
 
     public VeterinarianDashboardService(
             VeterinarianRepository veterinarianRepository,
-            VeterinarianTutorLinkRepository linkRepository,
+            DashboardMetricsReader dashboardMetricsReader,
             AnimalRepository animalRepository,
-            AppointmentRepository appointmentRepository,
-            ExamRepository examRepository) {
+            AppointmentRepository appointmentRepository) {
         this.veterinarianRepository = veterinarianRepository;
-        this.linkRepository = linkRepository;
+        this.dashboardMetricsReader = dashboardMetricsReader;
         this.animalRepository = animalRepository;
         this.appointmentRepository = appointmentRepository;
-        this.examRepository = examRepository;
     }
 
     @Transactional(readOnly = true)
     public VeterinarianDashboardResponseDTO getDashboard(String veterinarianCpf) {
-        if (!veterinarianRepository.findByCpf(veterinarianCpf).isPresent()) {
-            throw new CustomException("Veterinário não encontrado.", HttpStatus.NOT_FOUND);
-        }
+        var veterinarian = veterinarianRepository.findByCpf(veterinarianCpf)
+                .orElseThrow(() -> new CustomException(
+                        "Veterinário não encontrado.",
+                        HttpStatus.NOT_FOUND
+                ));
 
         LocalDateTime generatedAt = LocalDateTime.now();
-        LocalDateTime todayStart = generatedAt.toLocalDate().atStartOfDay();
-        LocalDateTime tomorrowStart = todayStart.plusDays(1);
+        var metrics = dashboardMetricsReader.readVeterinarianMetrics(
+                veterinarian.getId(),
+                veterinarianCpf,
+                generatedAt
+        );
         List<YearMonth> months = lastSixMonths(YearMonth.from(generatedAt));
         LocalDateTime seriesStart = months.getFirst().atDay(1).atStartOfDay();
         LocalDateTime seriesEnd = YearMonth.from(generatedAt).plusMonths(1).atDay(1).atStartOfDay();
-
-        long linkedTutors = linkRepository.countByVeterinarianCpfAndStatus(
-                veterinarianCpf,
-                LinkStatus.ACCEPTED
-        );
-        long activePatients = animalRepository.countByAcceptedVeterinarianLink(
-                veterinarianCpf,
-                LinkStatus.ACCEPTED
-        );
-        long appointmentsToday = appointmentRepository
-                .countByVeterinarianCpfAndScheduledAtGreaterThanEqualAndScheduledAtLessThanAndStatusNot(
-                        veterinarianCpf,
-                        todayStart,
-                        tomorrowStart,
-                        AppointmentStatus.CANCELLED
-                );
-
-        Map<AppointmentStatus, Long> appointmentsByStatus = new EnumMap<>(AppointmentStatus.class);
-        appointmentRepository.countByStatusForVeterinarian(veterinarianCpf)
-                .forEach(metric -> appointmentsByStatus.put(metric.getStatus(), metric.getCount()));
-
-        long pendingExams = examRepository.countByMedicalRecordVeterinarianCpfAndStatus(
-                veterinarianCpf,
-                ExamStatus.REQUESTED
-        );
 
         List<DashboardMonthlyAppointmentMetricDTO> monthlyMetrics = buildMonthlyMetrics(
                 months,
@@ -131,13 +105,13 @@ public class VeterinarianDashboardService {
                 .toList();
 
         return new VeterinarianDashboardResponseDTO(
-                linkedTutors,
-                activePatients,
-                appointmentsToday,
-                appointmentsByStatus.getOrDefault(AppointmentStatus.PENDING, 0L),
-                appointmentsByStatus.getOrDefault(AppointmentStatus.CONFIRMED, 0L),
-                appointmentsByStatus.getOrDefault(AppointmentStatus.COMPLETED, 0L),
-                pendingExams,
+                metrics.linkedTutors(),
+                metrics.activePatients(),
+                metrics.appointmentsToday(),
+                metrics.pendingAppointments(),
+                metrics.confirmedAppointments(),
+                metrics.completedAppointments(),
+                metrics.pendingExams(),
                 monthlyMetrics,
                 speciesMetrics,
                 upcomingAppointments,

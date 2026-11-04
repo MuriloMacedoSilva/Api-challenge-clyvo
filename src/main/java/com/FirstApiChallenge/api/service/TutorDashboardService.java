@@ -5,22 +5,19 @@ import com.FirstApiChallenge.api.dto.TutorDashboardRecentActivityDTO;
 import com.FirstApiChallenge.api.dto.TutorDashboardResponseDTO;
 import com.FirstApiChallenge.api.enums.AppointmentStatus;
 import com.FirstApiChallenge.api.enums.ExamStatus;
-import com.FirstApiChallenge.api.enums.LinkStatus;
 import com.FirstApiChallenge.api.exception.CustomException;
-import com.FirstApiChallenge.api.repository.AnimalRepository;
 import com.FirstApiChallenge.api.repository.AppointmentRepository;
+import com.FirstApiChallenge.api.repository.DashboardMetricsReader;
 import com.FirstApiChallenge.api.repository.ExamRepository;
 import com.FirstApiChallenge.api.repository.MedicalRecordRepository;
 import com.FirstApiChallenge.api.repository.PrescriptionRepository;
 import com.FirstApiChallenge.api.repository.TutorRepository;
 import com.FirstApiChallenge.api.repository.VaccinationRepository;
-import com.FirstApiChallenge.api.repository.VeterinarianTutorLinkRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,9 +33,8 @@ public class TutorDashboardService {
     );
 
     private final TutorRepository tutorRepository;
-    private final AnimalRepository animalRepository;
+    private final DashboardMetricsReader dashboardMetricsReader;
     private final AppointmentRepository appointmentRepository;
-    private final VeterinarianTutorLinkRepository linkRepository;
     private final ExamRepository examRepository;
     private final VaccinationRepository vaccinationRepository;
     private final MedicalRecordRepository medicalRecordRepository;
@@ -46,17 +42,15 @@ public class TutorDashboardService {
 
     public TutorDashboardService(
             TutorRepository tutorRepository,
-            AnimalRepository animalRepository,
+            DashboardMetricsReader dashboardMetricsReader,
             AppointmentRepository appointmentRepository,
-            VeterinarianTutorLinkRepository linkRepository,
             ExamRepository examRepository,
             VaccinationRepository vaccinationRepository,
             MedicalRecordRepository medicalRecordRepository,
             PrescriptionRepository prescriptionRepository) {
         this.tutorRepository = tutorRepository;
-        this.animalRepository = animalRepository;
+        this.dashboardMetricsReader = dashboardMetricsReader;
         this.appointmentRepository = appointmentRepository;
-        this.linkRepository = linkRepository;
         this.examRepository = examRepository;
         this.vaccinationRepository = vaccinationRepository;
         this.medicalRecordRepository = medicalRecordRepository;
@@ -65,14 +59,15 @@ public class TutorDashboardService {
 
     @Transactional(readOnly = true)
     public TutorDashboardResponseDTO getDashboard(String tutorCpf) {
-        if (tutorRepository.findByCpf(tutorCpf).isEmpty()) {
-            throw new CustomException("Tutor não encontrado.", HttpStatus.NOT_FOUND);
-        }
+        var tutor = tutorRepository.findByCpf(tutorCpf)
+                .orElseThrow(() -> new CustomException("Tutor não encontrado.", HttpStatus.NOT_FOUND));
 
         LocalDateTime generatedAt = LocalDateTime.now();
-        LocalDate today = generatedAt.toLocalDate();
-        LocalDateTime todayStart = today.atStartOfDay();
-        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        var metrics = dashboardMetricsReader.readTutorMetrics(
+                tutor.getId(),
+                tutorCpf,
+                generatedAt
+        );
 
         TutorDashboardNextAppointmentDTO nextAppointment = appointmentRepository
                 .findFirstByTutorCpfAndScheduledAtGreaterThanEqualAndStatusInOrderByScheduledAtAsc(
@@ -93,17 +88,12 @@ public class TutorDashboardService {
                 .orElse(null);
 
         return new TutorDashboardResponseDTO(
-                animalRepository.countByTutorCpf(tutorCpf),
-                appointmentRepository.countByTutorCpfAndScheduledAtGreaterThanEqualAndScheduledAtLessThanAndStatusNot(
-                        tutorCpf,
-                        todayStart,
-                        tomorrowStart,
-                        AppointmentStatus.CANCELLED
-                ),
-                appointmentRepository.countByTutorCpfAndStatus(tutorCpf, AppointmentStatus.PENDING),
-                linkRepository.countByTutorCpfAndStatus(tutorCpf, LinkStatus.ACCEPTED),
-                examRepository.countByMedicalRecordAnimalTutorCpfAndStatus(tutorCpf, ExamStatus.REQUESTED),
-                vaccinationRepository.countByAnimalTutorCpfAndNextDoseDateLessThanEqual(tutorCpf, today),
+                metrics.totalPets(),
+                metrics.appointmentsToday(),
+                metrics.pendingAppointments(),
+                metrics.linkedVeterinarians(),
+                metrics.pendingExams(),
+                metrics.vaccinationsAttention(),
                 nextAppointment,
                 buildRecentActivities(tutorCpf),
                 generatedAt
