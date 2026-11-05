@@ -4,7 +4,7 @@
 
 `script_bd_oracle.sql` define as 14 tabelas correspondentes às entidades JPA atuais. O profile Spring Boot `oracle` permite executar a mesma API sobre Oracle Database 19c sem substituir os profiles PostgreSQL ou H2.
 
-Segundo o inventário institucional fornecido ao projeto, o arquivo foi executado com sucesso no schema `RM566462` e criou os 14 objetos planejados. Esta atualização Java não abriu conexão com esse ambiente nem executou DDL ou DML. O arquivo não contém dados, `DROP`, `TRUNCATE`, packages, procedures, functions ou triggers. O SQL acadêmico original em `../../../database/2TDSA_2024_CodigoSql_Integrantes.sql` permanece separado e inalterado.
+Segundo confirmação manual fornecida ao projeto, o arquivo foi executado com sucesso no schema institucional e criou as 14 tabelas planejadas. Esta revisão documental não abriu conexão nem executou DDL ou DML. O arquivo não contém dados, `DROP`, `TRUNCATE`, packages, procedures, functions ou triggers; esses objetos PL/SQL estão em scripts separados, documentados no [índice Database](README.md). O [SQL acadêmico original](../../../database/2TDSA_2024_CodigoSql_Integrantes.sql) permanece separado.
 
 ## Ambiente institucional confirmado
 
@@ -17,7 +17,7 @@ Segundo o inventário institucional fornecido ao projeto, o arquivo foi executad
 | `MAX_STRING_SIZE` | `STANDARD` |
 | Privilégios informados | `CREATE TABLE`, `CREATE PROCEDURE`, `CREATE TRIGGER`, `CREATE SEQUENCE`, `CREATE VIEW` |
 
-O inventário informado de `USER_OBJECTS` contém objetos de projetos anteriores, incluindo `CLIENTE`, `PEDIDO`, `PRODUTO` e tabelas de IoT, mas nenhuma das 14 tabelas canônicas do CLYVO. Isso elimina colisão conhecida de tabelas, mas não substitui a verificação específica de constraints, índices, quota e tablespace imediatamente antes da execução.
+Antes da primeira implantação, o inventário informado de `USER_OBJECTS` não continha as 14 tabelas canônicas. Hoje elas já foram instaladas segundo confirmação manual; verificar objetos, constraints, índices e quota antes de qualquer implantação em **outro** schema, sem reaplicar o DDL no schema institucional.
 
 ## Objetos planejados
 
@@ -98,14 +98,14 @@ O profile `oracle` está configurado em `src/main/resources/application-oracle.p
 - `OracleDialect` explícito e `spring.jpa.hibernate.ddl-auto=validate`;
 - `spring.sql.init.mode=never`, sem seed, criação automática ou migration;
 - credenciais exclusivamente pelas variáveis obrigatórias `ORACLE_DB_URL`, `ORACLE_DB_USERNAME` e `ORACLE_DB_PASSWORD`;
-- pool pequeno por padrão, timeouts de conexão/leitura e falha rápida configuráveis pelas variáveis `ORACLE_*` documentadas em `.env.example`;
+- pool pequeno por padrão, timeouts de conexão/leitura e falha rápida configuráveis pelas variáveis `ORACLE_*` documentadas em [../.env.example](../.env.example);
 - SQL, formatação SQL e console H2 desabilitados.
 
 `Animal.history` usa `@JdbcTypeCode(SqlTypes.LONG32VARCHAR)`. No Hibernate 7.2 esse tipo materializado gera `text` no PostgreSQL e `CLOB` no Oracle/H2, mantendo a propriedade Java como `String`. `@Lob` não foi usado porque o dialect PostgreSQL o associaria a `oid`, incompatível com a coluna `text` existente.
 
 Os demais mapeamentos foram preservados. O `OracleDialect` representa `boolean` como `NUMBER(1,0)`, `Long` como `NUMBER(19,0)` e `Float` como `FLOAT(24)`, em alinhamento com o DDL. A validação de startup confirmou a compatibilidade estrutural; identities em DML, `LocalDate`, paginação, locks e transações ainda dependem de execução controlada no Oracle real.
 
-O profile já foi inicializado com sucesso no Oracle institucional: conexão JDBC, schema `RM566462`, Hibernate 7.2.12, validação de schema e criação do `EntityManagerFactory` concluíram sem erro. Isso valida a compatibilidade estrutural de startup, mas não substitui CRUD, transações e relacionamentos reais. O roteiro controlado está em `database/README-oracle-crud-tests.md`.
+O profile já foi inicializado com sucesso no Oracle institucional: conexão JDBC, schema `RM566462`, Hibernate 7.2.12, validação de schema e criação do `EntityManagerFactory` concluíram sem erro. Isso valida a compatibilidade estrutural de startup, mas não substitui CRUD, transações e relacionamentos reais. O [roteiro controlado](README-oracle-crud-tests.md) registra os limites das verificações.
 
 Os campos de 2000/4000 caracteres continuam sujeitos ao teto Oracle de 4000 bytes descrito acima. Migrá-los para `CLOB` exige alteração coordenada do DDL e do mapeamento, não uma mudança isolada no profile.
 
@@ -150,13 +150,13 @@ Os objetos acadêmicos devem permanecer separados durante esta fase:
 | `TB_ANIMAL` | Migrar para `ANIMAL`; converter nascimento em idade conforme regra definida e complementar altura/histórico. |
 | `TB_VACINACAO` | Migrar para `TB_VACCINATIONS`; remapear FKs e adicionar timestamps. |
 | `TB_FATO_ATENDIMENTO` | Preservar como extensão analítica/financeira ligada futuramente a `TB_APPOINTMENTS`. |
-| `TB_AUDITORIA_VACINACAO` | Preservar como extensão de auditoria futura de `TB_VACCINATIONS`. |
+| `TB_AUDITORIA_VACINACAO` | Preservar como legado ligado a `TB_VACINACAO`; a auditoria operacional usa `TB_CLYVO_VACCINATION_AUDIT`. |
 
 `TB_FATO_ATENDIMENTO` não equivale a `TB_APPOINTMENTS`: não possui Animal, Tutor ou status e armazena valor e espécie desnormalizada. Uma evolução segura deve referenciar `TB_APPOINTMENTS.ID`, definir se representa cobrança ou fato analítico e tratar espécie como snapshot deliberado.
 
-`TB_AUDITORIA_VACINACAO` pode evoluir para snapshots completos de `TB_VACCINATIONS`. A retenção após exclusão precisa ser definida antes de criar FK, e a auditoria deve registrar fabricante e observações, omitidos pela trigger acadêmica atual. Nenhuma trigger é criada nesta fase.
+`TB_AUDITORIA_VACINACAO` e sua trigger acadêmica permanecem ligadas à tabela legada `TB_VACINACAO`. A extensão operacional [TB_CLYVO_VACCINATION_AUDIT e TRG_CV_AUD_VACCINATION](README-oracle-vaccination-audit.md) já foi instalada separadamente, sem FK para a linha excluída e sem copiar o texto das observações.
 
-Functions, procedures e trigger do trabalho acadêmico referenciam as tabelas acadêmicas antigas. Packages futuros devem ser adaptados para as tabelas e colunas canônicas somente depois da implantação e da estratégia de migração de dados; não devem criar um segundo cadastro operacional.
+Functions, procedures e trigger do trabalho acadêmico original referenciam tabelas legadas; os três packages CLYVO e a trigger operacional descritos na [documentação Database](README.md) utilizam as tabelas canônicas. Triggers são objetos Oracle independentes e podem delegar sua lógica a procedures de packages.
 
 ## Pré-verificação obrigatória
 
@@ -486,7 +486,7 @@ O usuário confirmou a execução manual da specification, do body e do validado
 
 A integração Java foi coberta localmente com H2 e mocks, incluindo seleção por profile, parâmetros ID/TIMESTAMP, OUT numéricos, falhas incompletas e erros `-20021` a `-20025`. O usuário confirmou posteriormente testes manuais bem-sucedidos dos dashboards no profile `oracle`; nenhuma conexão institucional foi aberta durante a implementação local.
 
-## Auditoria vacinal preparada localmente
+## Auditoria vacinal Oracle instalada e validada manualmente
 
 `create_clyvo_vaccination_audit.sql`, `pkg_clyvo_auditoria_spec.sql`, `pkg_clyvo_auditoria_body.sql` e `trg_cv_aud_vaccination.sql` preparam uma extensão Oracle independente para auditar INSERT, UPDATE e DELETE em `TB_VACCINATIONS`. A trigger row-level delega ao package, que persiste snapshots OLD/NEW tipados na tabela `TB_CLYVO_VACCINATION_AUDIT` dentro da mesma transação. Não há `COMMIT`, `ROLLBACK`, autonomous transaction, SQL dinâmico ou supressão de erros.
 
@@ -494,10 +494,10 @@ Observações clínicas não são copiadas; somente um indicador registra se ela
 
 `validate_clyvo_vaccination_audit.sql` prepara validação somente leitura de objetos, erros, colunas, identity, constraints, índice, trigger, dependências e escopo. `test_clyvo_vaccination_audit_transactional.sql` é separado, explicitamente mutável, usa marcador `CV_AUD_TEST_*` e termina em rollback. `README-oracle-vaccination-audit.md` documenta pre-verificação, instalação, política fail-closed, teste concorrente de falha, retenção, riscos e evidências.
 
-Nenhum script da auditoria foi executado nem compilado no Oracle institucional nesta fase. Nenhuma conexão, DDL ou DML foi realizada, e os endpoints Java não foram alterados.
+O usuário confirmou instalação, compilação válida e trigger habilitada no Oracle institucional, validação estrutural read-only e ensaio transacional mutável. Antes do rollback foram observados quatro eventos: INSERT, UPDATE relevante, UPDATE apenas de observações e DELETE; UPDATE sem mudança auditável não gerou evento. Após o rollback, vacinação e eventos do ensaio não permaneceram. A presente revisão documental não executou nem repetiu essas operações. Os endpoints Java não foram alterados pela auditoria.
 
 ## Limites da validação desta fase
 
 Na implementação local do profile foram realizadas inspeção de código, resolução do driver e testes H2 sem abrir conexão Oracle. Posteriormente, a inicialização manual autorizada confirmou a conexão e o `ddl-auto=validate`, sem DDL ou deploy. Uma execução CRUD parcial posterior confirmou ping, cadastro/login de Tutor e cadastro de Animal, mas a leitura dos Animals encontrou uma `LazyInitializationException` na fronteira Service/Controller.
 
-O problema foi corrigido localmente sem alterar mappings, DDL ou o profile Oracle: `TutorService` consulta Animals diretamente, materializa `AnimalResponseDTO` dentro de uma transação read-only e o controller não percorre entidades. A auditoria aplicou a mesma fronteira transacional à listagem de Tutores vinculados. Três testes HTTP com banco H2 isolado e `spring.jpa.open-in-view=false` passaram. A suíte posterior à integração local dos indicadores possui 153 testes aprovados. Não houve nova conexão, DML ou limpeza Oracle durante essa implementação, portanto as chamadas Java aos packages e a releitura institucional permanecem pendentes. As demais identities em DML, datas, paginação, locks, transações e relacionamentos reais continuam condicionadas ao roteiro autorizado de `README-oracle-crud-tests.md`.
+O problema foi corrigido localmente sem alterar mappings, DDL ou profile: `TutorService` materializa `AnimalResponseDTO` dentro da transação read-only; a listagem de Tutores vinculados recebeu correção análoga. Três testes HTTP com H2 e `spring.jpa.open-in-view=false` passaram na etapa da correção. Depois, o usuário confirmou chamadas manuais bem-sucedidas ao histórico vacinal e aos dashboards no profile `oracle`. Isso não equivale a uma releitura institucional confirmada de Animals após a correção nem a CRUD Oracle completo, paginação, locks e transações clínicas. A última suíte local informada no projeto teve 153 testes aprovados; esta revisão não a executou. Ver [roteiro CRUD](README-oracle-crud-tests.md).

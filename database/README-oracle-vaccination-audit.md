@@ -2,7 +2,7 @@
 
 ## Estado
 
-Esta fase prepara a tabela `TB_CLYVO_VACCINATION_AUDIT`, o package `PKG_CLYVO_AUDITORIA`, a trigger `TRG_CV_AUD_VACCINATION` e os roteiros de validacao. O usuario confirmou a instalacao, compilacao valida e habilitacao desses objetos no Oracle institucional, alem da aprovacao da validacao estrutural somente leitura. O teste transacional mutavel ainda nao foi executado nesta etapa.
+Esta fase define a tabela `TB_CLYVO_VACCINATION_AUDIT`, o package `PKG_CLYVO_AUDITORIA`, a trigger `TRG_CV_AUD_VACCINATION` e os roteiros de validacao. O usuario confirmou instalacao, compilacao valida e habilitacao desses objetos no Oracle 19c institucional, validacao estrutural somente leitura e ensaio transacional mutavel concluido com rollback. Esta revisao documental nao repetiu esses procedimentos.
 
 Uma tentativa anterior de compilacao do body encontrou `PLS-00204` pelo uso de `DECODE` diretamente no `IF` de `PR_REGISTER_VACCINATION_EVENT`. O body e o trigger foram corrigidos com funcoes privadas sobrecarregadas para `NUMBER`, `VARCHAR2` e `DATE`, preservando comparacao null-safe, o filtro de UPDATE sem mudanca e `C_ERR_NO_CHANGE`. O usuario confirmou posteriormente ambos validos no Oracle; esta etapa nao recompilou os objetos.
 
@@ -66,6 +66,7 @@ Spring/JPA ou DML autorizado
 ```
 
 A trigger nao consulta nem modifica `TB_VACCINATIONS`, portanto nao cria mutating table. Ela nao atua sobre a tabela de auditoria, portanto nao ha recursao. Toda persistencia fica encapsulada no package.
+Triggers sao objetos independentes no Oracle: a trigger e criada por `trg_cv_aud_vaccination.sql` e chama a procedure do package, nao e um membro do package.
 
 ## Campos auditaveis
 
@@ -199,9 +200,9 @@ Pre-condicoes:
 - IDs inteiros positivos de um Animal e de um Veterinario existentes, conferidos e aprovados explicitamente como referencias descartaveis; o script solicita os dois IDs e confere sua existencia antes de qualquer INSERT;
 - sessao exclusiva nova, sem transacao pendente, cliente SQL*Plus/SQLcl ou SQL Developer em modo Script com prompts `ACCEPT` e autocommit desabilitado;
 - monitoramento da sessao e captura da saida, inclusive marcador e ID da vacinacao quando o bloco concluir;
-- revisao integral do script antes da execucao.
+- revisao integral do script antes da execucao. **No workspace atual as atribuicoes `v_animal_id NUMBER := 1` e `v_veterinarian_id NUMBER := 1` ignoram os dois prompts `ACCEPT`. Nao reutilizar o roteiro nesse estado:** antes de uma futura execucao autorizada, restaurar somente essas atribuicoes para `TO_NUMBER('&cv_aud_animal_id')` e `TO_NUMBER('&cv_aud_veterinarian_id')`, preservando as demais alteracoes locais. Esta revisao documental nao editou o SQL.
 
-Procedimento manual: conectar-se em sessao dedicada no schema autorizado, no diretorio `Java/api/database` executar `@test_clyvo_vaccination_audit_transactional.sql` em modo Script e responder aos dois prompts com os IDs aprovados. Nao reutilizar sessao com DML pendente: o `ROLLBACK` final desfaz toda transacao aberta na mesma sessao. O arquivo define `AUTOCOMMIT OFF` e `WHENEVER SQLERROR/OSERROR ... ROLLBACK`.
+Procedimento manual, **apenas apos corrigir e revisar as duas atribuicoes indicadas acima**: conectar-se em sessao dedicada no schema autorizado, no diretorio `Java/api/database` executar `@test_clyvo_vaccination_audit_transactional.sql` em modo Script e responder aos dois prompts com os IDs aprovados. Nao reutilizar sessao com DML pendente: o `ROLLBACK` final desfaz toda transacao aberta na mesma sessao. O arquivo define `AUTOCOMMIT OFF` e `WHENEVER SQLERROR/OSERROR ... ROLLBACK`.
 
 O script gera `CV_AUD_TEST_` + `RAWTOHEX(SYS_GUID())`, confirma que o marcador nao existe nas Vaccinations nem na auditoria, cria somente uma Vaccination e captura seu ID por `RETURNING`. Animal e Veterinario nao sao modificados. Na mesma transacao valida INSERT, UPDATE relevante, UPDATE sem mudanca auditavel, mudanca de observacoes sem copiar conteudo e DELETE; exige uma linha afetada em cada UPDATE/DELETE e exatamente quatro eventos antes do rollback. O bloco executa `ROLLBACK TO SAVEPOINT`, confirma zero linhas com o marcador nas duas tabelas e o arquivo termina com `ROLLBACK`. Sucesso imprime marcador, ID e `TESTE TRANSACIONAL OK`, seguido de `TESTE MUTAVEL CONCLUIDO COM ROLLBACK`.
 
@@ -264,4 +265,4 @@ Depois de instalacao e ensaio realmente autorizados, registrar sem exibir creden
 11. falha controlada impedindo a mutacao principal;
 12. consulta demonstrando ausencia de senhas, tokens e observacoes na tabela.
 
-Os objetos e a validacao estrutural read-only foram confirmados pelo usuario; o comportamento transacional mutavel ainda depende de ensaio manual autorizado. Nao afirmar a execucao do teste sem suas evidencias reais.
+Os objetos, a validacao estrutural read-only e o teste transacional mutavel foram confirmados manualmente pelo usuario: quatro eventos antes do rollback (INSERT, UPDATE relevante, alteracao de observacoes e DELETE), nenhum evento para UPDATE sem mudanca auditavel e nenhuma linha do ensaio apos rollback. A revisao documental nao obteve novas evidencias nem executou o script. O teste de falha concorrente com duas sessoes permanece apenas documentado.

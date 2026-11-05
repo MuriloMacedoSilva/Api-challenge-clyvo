@@ -142,7 +142,7 @@ Os cursores usam o intervalo semiaberto:
 SCHEDULED_AT >= P_INICIO AND SCHEDULED_AT < P_FIM
 ```
 
-O package nao substitui o instante recebido por `SYSDATE` ou `SYSTIMESTAMP`. A aplicacao futura devera enviar o mesmo instante usado como `generatedAt`. Como o modelo atual nao persiste timezone, JVM e Oracle devem continuar alinhados ao horario local assumido pelo projeto.
+O package nao substitui o instante recebido por `SYSDATE` ou `SYSTIMESTAMP`. A aplicacao atual envia o mesmo instante usado como `generatedAt` nas duas procedures de indicadores; as procedures de consultas por periodo ainda nao sao chamadas pelo Java. Como o modelo atual nao persiste timezone, JVM e Oracle devem continuar alinhados ao horario local assumido pelo projeto.
 
 ## Cursores de Appointment
 

@@ -12,7 +12,7 @@ Arquivos:
 - `pkg_clyvo_vacinacao_body.sql`: implementacao;
 - `validate_pkg_clyvo_vacinacao.sql`: verificacao somente leitura posterior a compilacao.
 
-O package nao cria tabelas, nao modifica as 14 tabelas operacionais, nao executa DML e nao contem `COMMIT`, `ROLLBACK`, SQL dinamico ou trigger. `PKG_CLYVO_RELATORIOS` e a integracao Java das outras tres operacoes permanecem fora desta fase.
+O package nao cria tabelas, nao modifica as 14 tabelas operacionais, nao executa DML e nao contem `COMMIT`, `ROLLBACK`, SQL dinamico ou trigger. [PKG_CLYVO_RELATORIOS](README-oracle-pkg-relatorios.md) reutiliza `FN_QTD_ATENCOES_TUTOR`; as outras operacoes vacinais nao possuem consumidor Java direto.
 
 ## Responsabilidade
 

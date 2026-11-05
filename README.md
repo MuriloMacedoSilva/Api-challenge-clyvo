@@ -2,6 +2,8 @@
 
 Backend REST do CLYVO, uma aplicação veterinária que conecta Tutores, Veterinários e Animais. O sistema organiza vínculos, consultas, prontuários, prescrições, exames, vacinações, notificações, conversas e dashboards analíticos do Tutor e do Veterinário.
 
+**Documentação de banco e Sprint 4:** [Database](database/README.md) (Oracle 19c, PL/SQL, auditoria e Oracle → MongoDB). O [microsserviço de IA](../../dotNET/Clyvo.AI/README.md) tem configuração e armazenamento próprios.
+
 ## Sumário
 
 - [Parte I: DevOps e Infraestrutura](#parte-i-devops-e-infraestrutura)
@@ -11,7 +13,7 @@ Backend REST do CLYVO, uma aplicação veterinária que conecta Tutores, Veterin
 
 ## Descrição da Solução
 
-A API usa Java 21, Spring Boot 4.0.6, Spring MVC, Spring Data JPA/Hibernate e PostgreSQL 16. O profile `local` usa PostgreSQL, `prod` recebe conexão exclusivamente por variáveis de ambiente e valida o schema criado por `database/script_bd.sql`, `render` usa H2 em memória com seed automático de demonstração e `test` usa H2 em memória para a suíte automatizada.
+A API usa Java 21, Spring Boot 4.0.6, Spring MVC e Spring Data JPA/Hibernate. `local` e `prod` usam PostgreSQL 16, `oracle` usa Oracle 19c acadêmico com schema previamente instalado, `render` usa H2 em memória com seed automático e `test` usa H2 em memória. Detalhes dos profiles estão [abaixo](#profiles-spring).
 
 O deploy acadêmico validado segue a opção ACR + ACI aprovada pelo professor: um único Azure Container Instance/Container Group contém a API e o PostgreSQL. A API acessa o banco por `localhost:5432`; apenas a porta `8080` é pública. O PostgreSQL usa o filesystem interno do container.
 
@@ -137,7 +139,7 @@ O `Dockerfile.postgres` deriva de `postgres:16`. O schema é copiado para `/dock
 
 ## Schema e Profiles
 
-`database/script_bd.sql` contém 14 tabelas correspondentes às 14 Entities atuais, com PKs identity, FKs, unicidades, `NOT NULL`, checks dos enums, `item_order`, índices e comentários PostgreSQL. Não contém `DROP`, `TRUNCATE` ou dados.
+`database/script_bd.sql` contém 14 tabelas correspondentes às 14 Entities atuais, com PKs identity, FKs, unicidades, `NOT NULL`, checks dos enums, `item_order`, índices e comentários PostgreSQL. Não contém `DROP`, `TRUNCATE` ou dados. O DDL Oracle equivalente e os scripts PL/SQL são apresentados no [índice Database](database/README.md); não executar o DDL PostgreSQL no Oracle.
 
 - `local`: `ddl-auto=update`, preservado para compatibilidade com bancos locais existentes.
 - `prod`: `ddl-auto=validate`; o schema deve existir antes da API iniciar.
@@ -447,13 +449,7 @@ Resultado esperado: `clyvo`, nunca `root` ou `admin`. Também pode executar `--e
 
 Para cada mutação, execute a chamada HTTP e o SELECT correspondente no PostgreSQL. Isso demonstra a integração entre os dois containers em nuvem. Não use restart como teste: o filesystem é interno e não oferece durabilidade após recriação do Container Group.
 
-## Testes Java
-
-Os testes não dependem de Docker/PostgreSQL porque ativam o profile `test` com H2:
-
-```bash
-./mvnw test
-```
+Os testes Java com H2 não dependem de Docker/PostgreSQL; veja [Testes Automatizados](#testes-automatizados).
 
 ## Limpeza
 
@@ -488,6 +484,7 @@ Os fluxos atendem dois perfis:
 | Spring Data JPA / Hibernate | Gerenciada pelo Spring Boot | Persistência e consultas |
 | Jakarta Bean Validation | Gerenciada pelo Spring Boot | Validação dos DTOs de entrada |
 | PostgreSQL | Driver runtime | Banco dos profiles `local` e `prod` |
+| Oracle JDBC (`ojdbc11`) | Driver runtime | Banco do profile `oracle` |
 | H2 | Driver runtime | Banco dos profiles `render` e `test` |
 | Springdoc OpenAPI | 3.0.2 | OpenAPI e Swagger UI |
 | Lombok | Gerenciada pelo Spring Boot | Redução de código repetitivo nas classes Java |
@@ -499,6 +496,7 @@ O artefato Maven é `com.FirstApiChallenge:api:0.0.1-SNAPSHOT` e o pacote-base �
 
 ```text
 src/main/java/com/FirstApiChallenge/api/
+|-- client/       # Cliente HTTP do microsserviço CLYVO AI
 |-- config/       # Inicialização exclusiva do ambiente Render
 |-- controller/   # Endpoints HTTP e montagem de ResponseEntity
 |-- dto/          # Contratos de entrada e saída
@@ -516,7 +514,7 @@ Cliente HTTP
 -> Controller
 -> Service
 -> Repository
--> PostgreSQL ou H2
+-> PostgreSQL, Oracle ou H2 (segundo o profile)
 ```
 
 Decisões presentes no código:
@@ -681,12 +679,14 @@ A métrica vacinal é uma contagem objetiva de registros por `nextDoseDate`; ela
 
 ### CLYVO AI
 
-O endpoint de IA para Tutor recebe somente a pergunta. O Java valida Tutor, Animal e propriedade, monta contexto clinico limitado e chama `POST /api/v1/ai/chat` do microsservico .NET por meio do `ClyvoAiClient`. O .NET nao acessa o banco e nao recebe CPF, senha, telefone, e-mail ou entidades JPA.
+O fluxo é **aplicativo mobile → endpoint Java do Tutor → `ClyvoAiClient` → .NET CLYVO AI → Ollama**. O Java valida Tutor, Animal e propriedade, monta contexto clínico limitado e chama `POST /api/v1/ai/chat` do .NET. Não envia CPF, senha, telefone, e-mail ou entidades JPA. O .NET não acessa o Oracle nem as collections exportadas `clyvo_exports`.
 
 - `CLYVO_AI_URL` configura a URL base; o fallback local e `http://localhost:5283`;
 - o timeout da chamada e 130 segundos;
 - sao enviados no maximo 5 prontuarios, prescricoes desses prontuarios, 5 exames, 10 vacinacoes e 5 consultas relevantes;
 - indisponibilidade retorna `503`, timeout retorna `504` e resposta invalida do provider retorna `502`.
+
+O .NET preserva o contrato HTTP e oferece **duas opções independentes, desabilitadas por padrão**: metadados internos de sessões/interações no MongoDB (`AiPersistence__Enabled`) e métricas operacionais com EF Core 8/SQLite (`AiMetrics__Enabled`). Quando o Mongo está ativo, cada POST gera uma sessão interna isolada: não existe continuidade de conversa entre chamadas, endpoint público de histórico ou autenticação de histórico. Ver [configuração e migrations manuais do .NET](../../dotNET/Clyvo.AI/README.md). Para execução local da cadeia, inicie o Ollama com o modelo configurado, execute `dotnet run --project Clyvo.AI.Api --launch-profile http` na pasta `dotNET/Clyvo.AI`, e configure `CLYVO_AI_URL` no processo Java se a URL diferir de `http://localhost:5283`. `GET http://localhost:5283/health` verifica somente liveness; `GET http://localhost:8080/tutor/ping` verifica a API Java. Uma chamada ao endpoint de IA por Tutor/Animal fictícios autorizados verifica a integração completa; não publicar contextos clínicos reais.
 
 ## Endpoints
 
@@ -885,6 +885,29 @@ Exceções ao envelope JSON:
 
 Os profiles são do Spring. Não existem profiles Maven definidos no `pom.xml`.
 
+### Integração PL/SQL no Oracle
+
+O profile `oracle` usa o mesmo conjunto de controllers, DTOs e services dos outros profiles. `src/main/resources/application-oracle.properties` exige `ORACLE_DB_URL`, `ORACLE_DB_USERNAME` e `ORACLE_DB_PASSWORD`, configura `OracleDialect`, `ojdbc11` via `pom.xml`, desabilita SQL init e exige schema existente com `ddl-auto=validate`. Pool e timeouts podem ser ajustados pelas variáveis `ORACLE_*` listadas em [.env.example](.env.example). Não colocar senha em comandos, exemplos versionados ou logs.
+
+| Uso | `oracle` | `local`/`prod`/`render`/`test` |
+|---|---|---|
+| Histórico vacinal | `VaccinationService` → `VaccinationHistoryReader` → `OracleVaccinationHistoryReader` → `SimpleJdbcCall` → `PKG_CLYVO_VACINACAO.PR_HISTORICO_ANIMAL` | `JpaVaccinationHistoryReader` → `VaccinationRepository` |
+| Contadores dos dashboards | `TutorDashboardService`/`VeterinarianDashboardService` → `DashboardMetricsReader` → `OracleDashboardMetricsReader` → `SimpleJdbcCall` → `PKG_CLYVO_RELATORIOS.PR_INDICADORES_TUTOR`/`PR_INDICADORES_VETERINARIO` | `JpaDashboardMetricsReader` → repositories JPA |
+
+Autorização de propriedade/vínculo e resolução do ator por CPF ocorrem nos services antes dos readers. Os readers Oracle declaram parâmetros JDBC explicitamente, sem descoberta de metadata; o cursor vacinal é mapeado para o mesmo DTO REST. Próxima consulta, atividades recentes, série mensal e espécies permanecem em JPA. As functions e procedures adicionais dos packages não são chamadas diretamente pelo Java; a função vacinal de atenção é reutilizada pelo package de relatórios. A [trigger de auditoria](database/README-oracle-vaccination-audit.md) é disparada pelo Oracle nas mutações da tabela, sem chamada Java direta.
+
+Para iniciar manualmente em ambiente autorizado, com o schema já instalado (na raiz `Java/api`):
+
+```bash
+export SPRING_PROFILES_ACTIVE=oracle
+export ORACLE_DB_URL='jdbc:oracle:thin:@//host:1521/service-name'
+export ORACLE_DB_USERNAME='usuario-do-schema'
+read -rs ORACLE_DB_PASSWORD && export ORACLE_DB_PASSWORD
+./mvnw spring-boot:run
+```
+
+O Docker Compose deste backend é dedicado ao PostgreSQL e não fornece Oracle. Para verificar integração sem DML institucional, consultar `GET /tutor/ping`, `GET /v3/api-docs`, histórico vacinal e dashboards de atores fictícios previamente autorizados. A inicialização valida apenas o schema JPA, não a compilação dos packages; conferir `USER_OBJECTS`/`USER_ERRORS` conforme os [roteiros Database](database/README.md). Chamadas Oracle de histórico e dashboards foram confirmadas **manualmente pelo usuário**, não nesta revisão.
+
 ## Desenvolvimento Local com Maven
 
 ### Pré-requisitos
@@ -945,26 +968,7 @@ O profile `test` é ativado por `src/test/resources/application.properties` e us
 ./mvnw test
 ```
 
-O código-fonte atual contém 153 testes distribuídos entre:
-
-| Área | Quantidade |
-|---|---:|
-| Orquestração CLYVO AI | 15 |
-| Client HTTP CLYVO AI | 8 |
-| Chat | 15 |
-| Vacinação e contrato REST | 17 |
-| Readers Oracle e seleção por profile | 30 |
-| Dashboard do Veterinário | 13 |
-| Dashboard do Tutor | 19 |
-| Consultas | 3 |
-| Prontuários | 3 |
-| Prescrições | 3 |
-| Exames | 3 |
-| Contexto da aplicação e histórico extenso | 2 |
-| Configuração do profile Oracle | 2 |
-| Reexecução do seed H2 | 1 |
-| Push notifications e tokens | 16 |
-| Leitura transacional de Animals com OSIV desabilitado | 3 |
+O último resultado automatizado local registrado em [AGENTS.md](../../AGENTS.md) foi **153 testes aprovados** (H2/mocks). Esta revisão documental não executou Maven nem recontou testes; o total deve ser reconfirmado ao preparar as evidências finais. Os testes Java com mocks não substituem chamadas JDBC no Oracle institucional.
 
 A maior parte da suíte testa services com contexto Spring. Dashboard, registro de push e leitura de Animals também possuem cobertura HTTP com MockMvc. Os testes de Animals usam H2 isolado com OSIV desabilitado e cobrem o endpoint do Tutor e a listagem análoga de Tutores vinculados. Não há testes dedicados para autenticação, cadastro de Tutor/Veterinário e para a maioria dos controllers.
 

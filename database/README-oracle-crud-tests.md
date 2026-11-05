@@ -9,7 +9,7 @@ Já foi confirmado:
 - o DDL das 14 entidades foi criado manualmente no schema `RM566462`;
 - a API iniciou com o profile `oracle`, conectou ao Oracle e concluiu `ddl-auto=validate`;
 - Hibernate 7.2.12 criou o `EntityManagerFactory` e a aplicação iniciou na porta 8080;
-- os 121 testes automatizados com H2 passaram;
+- na etapa inicial desse roteiro, 121 testes automatizados com H2 haviam passado; o último resultado local registrado no projeto foi de 153 testes, não reexecutados nesta revisão;
 - o teste H2 de `Animal.history` persistiu 40.000 caracteres.
 - uma execução Oracle parcial confirmou ping, cadastro e login de Tutor e cadastro de Animal;
 - a leitura inicial de Animals falhou com `LazyInitializationException` porque `TutorService` devolvia a coleção lazy para conversão no controller;
