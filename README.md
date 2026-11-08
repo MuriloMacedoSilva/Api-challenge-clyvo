@@ -17,6 +17,8 @@ A API usa Java 21, Spring Boot 4.0.6, Spring MVC e Spring Data JPA/Hibernate. `l
 
 O deploy acadêmico validado segue a opção ACR + ACI aprovada pelo professor: um único Azure Container Instance/Container Group contém a API e o PostgreSQL. A API acessa o banco por `localhost:5432`; apenas a porta `8080` é pública. O PostgreSQL usa o filesystem interno do container.
 
+Uma opção independente de evolução para **App Service Linux Java SE 21 com Terraform e Azure DevOps** está descrita em [infra/app-service/README.md](infra/app-service/README.md). Ela começa pelo [bootstrap Terraform dos Resource Groups e states](infra/bootstrap/README.md), seguido pela [configuração federada do Azure DevOps](infra/devops/README.md) e pelo [RBAC da identidade da pipeline](infra/access/README.md). Exige banco PostgreSQL durável externo, configuração manual de secrets e aprovações antes do primeiro deploy; não substitui nem altera o fluxo ACR/ACI validado abaixo.
+
 > O fluxo foi validado de ponta a ponta com Docker, ACR e ACI. Como não há volume externo, recriar ou excluir o Container Group perde os dados; use somente dados fictícios de demonstração.
 
 ## Benefícios para o Negócio

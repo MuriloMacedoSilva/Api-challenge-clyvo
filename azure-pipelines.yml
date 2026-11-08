@@ -1,0 +1,278 @@
+# Raiz deste repositório Git = Java/api (não a raiz do workspace de disciplinas).
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/**
+      - pom.xml
+      - mvnw
+      - mvnw.cmd
+      - .mvn/**
+      - infra/app-service/**
+      - azure-pipelines.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/**
+      - pom.xml
+      - mvnw
+      - mvnw.cmd
+      - .mvn/**
+      - infra/app-service/**
+      - azure-pipelines.yml
+
+parameters:
+  - name: azureServiceConnection
+    type: string
+    default: CONFIGURE_ARM_WIF_SERVICE_CONNECTION
+  - name: variableGroupName
+    type: string
+    default: CONFIGURE_NON_SECRET_VARIABLE_GROUP
+  - name: authorizeApply
+    type: boolean
+    default: false
+  - name: authorizeDeploy
+    type: boolean
+    default: false
+
+variables:
+  - group: ${{ parameters.variableGroupName }}
+  - name: terraformVersion
+    value: '1.10.5'
+  - name: terraformDirectory
+    value: 'infra/app-service'
+
+stages:
+  - stage: Build
+    displayName: Java 21 - build e testes
+    jobs:
+      - job: BuildJar
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: JavaToolInstaller@0
+            inputs:
+              versionSpec: '21'
+              jdkArchitectureOption: x64
+              jdkSourceOption: PreInstalled
+          - bash: ./mvnw -B clean verify
+            displayName: Maven Wrapper - compilar e testar
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: 'target/surefire-reports/TEST-*.xml'
+              failTaskOnFailedTests: true
+          - bash: |
+              set -euo pipefail
+              mkdir -p "$(Build.ArtifactStagingDirectory)/jar"
+              cp target/api-0.0.1-SNAPSHOT.jar "$(Build.ArtifactStagingDirectory)/jar/app.jar"
+              sha256sum "$(Build.ArtifactStagingDirectory)/jar/app.jar"
+            displayName: Preparar JAR executável
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/jar'
+              artifact: java-api
+
+  - stage: TerraformCheck
+    displayName: Terraform - formato e validação sem backend
+    dependsOn: []
+    jobs:
+      - job: Validate
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: $(terraformVersion)
+          - bash: |
+              set -euo pipefail
+              terraform fmt -check -recursive
+              terraform init -backend=false -input=false
+              terraform validate -no-color
+            workingDirectory: $(terraformDirectory)
+            displayName: fmt / init local / validate
+
+  - stage: Plan
+    displayName: Terraform - plan para revisão
+    dependsOn:
+      - Build
+      - TerraformCheck
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual'))
+    jobs:
+      - job: PlanInfrastructure
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: $(terraformVersion)
+          - task: AzureCLI@2
+            displayName: Plan com ARM Workload Identity Federation
+            inputs:
+              azureSubscription: ${{ parameters.azureServiceConnection }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              workingDirectory: $(terraformDirectory)
+              addSpnToEnvironment: true
+              inlineScript: |
+                set -euo pipefail
+                : "${TF_STATE_RESOURCE_GROUP:?} ${TF_STATE_STORAGE_ACCOUNT:?} ${TF_STATE_CONTAINER:?} ${TF_STATE_KEY:?}"
+                : "${TF_RESOURCE_GROUP:?} ${TF_LOCATION:?} ${TF_PLAN_NAME:?} ${TF_WEB_APP_NAME:?} ${TF_ENVIRONMENT:?}"
+                [[ "$TF_STATE_CONTAINER" == appstate && "$TF_STATE_KEY" == "app-service/${TF_ENVIRONMENT}.tfstate" ]] || { echo 'Backend da aplicação inválido.' >&2; exit 1; }
+                export ARM_USE_OIDC=true ARM_USE_AZUREAD=true
+                export ARM_CLIENT_ID="$servicePrincipalId" ARM_TENANT_ID="$tenantId" ARM_OIDC_TOKEN="$idToken"
+                export ARM_SUBSCRIPTION_ID
+                ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+                terraform init -input=false -reconfigure \
+                  -backend-config="resource_group_name=$TF_STATE_RESOURCE_GROUP" \
+                  -backend-config="storage_account_name=$TF_STATE_STORAGE_ACCOUNT" \
+                  -backend-config="container_name=$TF_STATE_CONTAINER" \
+                  -backend-config="key=$TF_STATE_KEY" \
+                  -backend-config="use_azuread_auth=true" -backend-config="use_oidc=true"
+                export TF_VAR_resource_group_name="$TF_RESOURCE_GROUP" TF_VAR_location="$TF_LOCATION"
+                export TF_VAR_app_service_plan_name="$TF_PLAN_NAME" TF_VAR_web_app_name="$TF_WEB_APP_NAME"
+                export TF_VAR_environment="$TF_ENVIRONMENT"
+                mkdir -p "$(Build.ArtifactStagingDirectory)/tfplan"
+                terraform plan -input=false -no-color -lock=true \
+                  -out="$(Build.ArtifactStagingDirectory)/tfplan/plan.tfplan"
+                terraform show -json "$(Build.ArtifactStagingDirectory)/tfplan/plan.tfplan" | python3 -c '
+                import json, sys
+                changes = json.load(sys.stdin)["resource_changes"]
+                for change in changes:
+                    print(change["address"], ",".join(change["change"]["actions"]))
+                if any("delete" in c["change"]["actions"] for c in changes):
+                    sys.exit("Plan contém exclusão/substituição: bloqueado; investigar sem aplicar.")
+                '
+            env:
+              TF_STATE_RESOURCE_GROUP: $(TF_STATE_RESOURCE_GROUP)
+              TF_STATE_STORAGE_ACCOUNT: $(TF_STATE_STORAGE_ACCOUNT)
+              TF_STATE_CONTAINER: $(TF_STATE_CONTAINER)
+              TF_STATE_KEY: $(TF_STATE_KEY)
+              TF_RESOURCE_GROUP: $(TF_RESOURCE_GROUP)
+              TF_LOCATION: $(TF_LOCATION)
+              TF_PLAN_NAME: $(TF_PLAN_NAME)
+              TF_WEB_APP_NAME: $(TF_WEB_APP_NAME)
+              TF_ENVIRONMENT: $(TF_ENVIRONMENT)
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/tfplan'
+              artifact: reviewed-tfplan
+
+  - stage: ApproveApply
+    displayName: Aprovação humana do plan
+    dependsOn: Plan
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.authorizeApply }})
+    jobs:
+      - job: ManualReview
+        pool: server
+        timeoutInMinutes: 4320
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 4320
+            inputs:
+              notifyUsers: ''
+              instructions: 'Revisar o log do Plan e o plan.tfplan desta execução, custos, nomes e escopo. Aprovar somente após validar os recursos.'
+              onTimeout: reject
+
+  - stage: Apply
+    displayName: Terraform - aplicar plan aprovado
+    dependsOn: ApproveApply
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.authorizeApply }})
+    jobs:
+      - job: ApplyInfrastructure
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: $(terraformVersion)
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              artifactName: reviewed-tfplan
+              targetPath: '$(Pipeline.Workspace)/reviewed-tfplan'
+          - task: AzureCLI@2
+            displayName: Aplicar exatamente o plan desta execução
+            inputs:
+              azureSubscription: ${{ parameters.azureServiceConnection }}
+              scriptType: bash
+              scriptLocation: inlineScript
+              workingDirectory: $(terraformDirectory)
+              addSpnToEnvironment: true
+              inlineScript: |
+                set -euo pipefail
+                : "${TF_STATE_RESOURCE_GROUP:?} ${TF_STATE_STORAGE_ACCOUNT:?} ${TF_STATE_CONTAINER:?} ${TF_STATE_KEY:?}"
+                : "${TF_ENVIRONMENT:?}"
+                [[ "$TF_STATE_CONTAINER" == appstate && "$TF_STATE_KEY" == "app-service/${TF_ENVIRONMENT}.tfstate" ]] || { echo 'Backend da aplicação inválido.' >&2; exit 1; }
+                export ARM_USE_OIDC=true ARM_USE_AZUREAD=true
+                export ARM_CLIENT_ID="$servicePrincipalId" ARM_TENANT_ID="$tenantId" ARM_OIDC_TOKEN="$idToken"
+                export ARM_SUBSCRIPTION_ID
+                ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+                terraform init -input=false -reconfigure \
+                  -backend-config="resource_group_name=$TF_STATE_RESOURCE_GROUP" \
+                  -backend-config="storage_account_name=$TF_STATE_STORAGE_ACCOUNT" \
+                  -backend-config="container_name=$TF_STATE_CONTAINER" \
+                  -backend-config="key=$TF_STATE_KEY" \
+                  -backend-config="use_azuread_auth=true" -backend-config="use_oidc=true"
+                terraform apply -input=false -no-color -lock=true "$(Pipeline.Workspace)/reviewed-tfplan/plan.tfplan"
+                terraform output -no-color default_hostname
+            env:
+              TF_STATE_RESOURCE_GROUP: $(TF_STATE_RESOURCE_GROUP)
+              TF_STATE_STORAGE_ACCOUNT: $(TF_STATE_STORAGE_ACCOUNT)
+              TF_STATE_CONTAINER: $(TF_STATE_CONTAINER)
+              TF_STATE_KEY: $(TF_STATE_KEY)
+              TF_ENVIRONMENT: $(TF_ENVIRONMENT)
+
+  - stage: ApproveDeploy
+    displayName: Aprovação humana do deploy
+    dependsOn: Apply
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.authorizeDeploy }})
+    jobs:
+      - job: ManualReview
+        pool: server
+        timeoutInMinutes: 4320
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 4320
+            inputs:
+              notifyUsers: ''
+              instructions: 'Confirmar banco externo, schema, App Settings/Key Vault references, destino e JAR da execução antes do deploy.'
+              onTimeout: reject
+
+  - stage: Deploy
+    displayName: App Service Linux - publicar JAR
+    dependsOn: ApproveDeploy
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.authorizeDeploy }})
+    jobs:
+      - job: DeployJar
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: current
+              artifactName: java-api
+              targetPath: '$(Pipeline.Workspace)/java-api'
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: ${{ parameters.azureServiceConnection }}
+              appType: webAppLinux
+              appName: $(TF_WEB_APP_NAME)
+              package: '$(Pipeline.Workspace)/java-api/app.jar'
+          - bash: |
+              set -euo pipefail
+              : "${TF_WEB_APP_NAME:?} ${TF_RESOURCE_GROUP:?}"
+              echo "App: $TF_WEB_APP_NAME | RG: $TF_RESOURCE_GROUP | run: $(Build.BuildId)"
+              echo "Verificar: https://$TF_WEB_APP_NAME.azurewebsites.net/tutor/ping"
+              echo "OpenAPI: https://$TF_WEB_APP_NAME.azurewebsites.net/v3/api-docs"
+            displayName: Endpoints e identificador da implantação
+            env:
+              TF_WEB_APP_NAME: $(TF_WEB_APP_NAME)
+              TF_RESOURCE_GROUP: $(TF_RESOURCE_GROUP)

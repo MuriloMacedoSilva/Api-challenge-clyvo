@@ -34,3 +34,14 @@ build/
 
 ### Environment ###
 .env
+
+### Terraform local state and plans (remote state is configured separately) ###
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/crash.log
+**/crash.*.log
+**/*.auto.tfvars
+**/*.tfvars
+!**/*.tfvars.example
